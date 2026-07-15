@@ -82,14 +82,20 @@ func (c *Client) Ready() bool {
 }
 
 // Connect builds the StreamDialer. Safe to call multiple times (replaces dialer).
+// ssconf:// keys are fetched and expanded to ss:// on each Connect (fresh static key).
 func (c *Client) Connect(ctx context.Context) error {
-	d, err := c.providers.NewStreamDialer(ctx, c.accessKey)
+	key, err := ExpandAccessKey(ctx, c.accessKey)
+	if err != nil {
+		c.ready.Store(false)
+		return fmt.Errorf("outline expand key: %w", err)
+	}
+	d, err := c.providers.NewStreamDialer(ctx, key)
 	if err != nil {
 		c.ready.Store(false)
 		return fmt.Errorf("outline dialer: %w", err)
 	}
-	// Best-effort re-resolve server IP on connect.
-	if ip, err := ResolveServerIP(c.accessKey); err == nil {
+	// Best-effort re-resolve server IP from expanded key.
+	if ip, err := ResolveServerIP(key); err == nil {
 		c.mu.Lock()
 		c.serverIP = ip
 		c.mu.Unlock()
