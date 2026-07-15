@@ -70,7 +70,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		RoutingMode:      ModeExclude,
 		DirectPolicy:     DirectAllow,
 		LANInterface:     "",
-		GatewayEnable:    true,
+		GatewayEnable:    false,
 		SOCKSListen:      "0.0.0.0:1080",
 		HealthListen:     "0.0.0.0:8080",
 		LogLevel:         "info",

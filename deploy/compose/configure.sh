@@ -62,11 +62,11 @@ echo "=== outline-gate: настройка ==="
 echo
 
 # Key
-KEY_METHOD=$(prompt KEY_METHOD "Ключ: (1) ввести ss:// в .env  (2) сохранить в secrets/outline_key.txt" "1")
+KEY_METHOD=$(prompt KEY_METHOD "Ключ: (1) ввести ss:// или ssconf:// в .env  (2) сохранить в secrets/outline_key.txt" "1")
 case "$KEY_METHOD" in
   2)
     if [[ -t 0 ]]; then
-      read -r -p "Вставьте Outline access key (ss://...): " ACCESS_KEY
+      read -r -p "Вставьте Outline access key (ss://... или ssconf://...): " ACCESS_KEY
     else
       echo "Нет TTY — задайте OUTLINE_ACCESS_KEY в .env вручную" >&2
       exit 1
@@ -84,7 +84,7 @@ case "$KEY_METHOD" in
     ;;
   *)
     if [[ -t 0 ]]; then
-      read -r -p "Вставьте Outline access key (ss://...): " ACCESS_KEY
+      read -r -p "Вставьте Outline access key (ss://... или ssconf://...): " ACCESS_KEY
     else
       echo "Нет TTY — задайте OUTLINE_ACCESS_KEY в .env вручную" >&2
       exit 1

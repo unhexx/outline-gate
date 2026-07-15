@@ -21,8 +21,8 @@ func TestLoadFromEnv_MinimalExclude(t *testing.T) {
 	if len(cfg.BypassCIDRs) < 5 {
 		t.Fatalf("expected default bypass CIDRs, got %d", len(cfg.BypassCIDRs))
 	}
-	if !cfg.GatewayEnable {
-		t.Fatal("gateway should default true")
+	if cfg.GatewayEnable {
+		t.Fatal("gateway should default false (SOCKS-only until explicitly enabled)")
 	}
 }
 

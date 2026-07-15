@@ -4,7 +4,7 @@
 
 **outline-gate** — Docker-сервис, который:
 
-1. Подключается к удалённому **Outline** (Shadowsocks) по access key `ss://...`.
+1. Подключается к удалённому **Outline** (Shadowsocks) по access key `ss://...` или динамическому `ssconf://...`.
 2. Отдаёт локальный **SOCKS5** (`:1080`) для приложений и клиентов LAN.
 3. Опционально работает как **L3-шлюз** (nftables): клиенты LAN направляют трафик через хост, сервис решает, что идёт в туннель, а что напрямую.
 
@@ -19,7 +19,7 @@
 
 - Linux-хост (для L3-шлюза) или любой Docker-хост (для SOCKS)
 - Docker Engine 20+ и Docker Compose v2
-- Access key Outline (`ss://...`) от Outline Manager / провайдера
+- Access key Outline (`ss://...` или `ssconf://...`) от Outline Manager / провайдера
 - Свободные порты: **1080** (SOCKS), **8080** (health) — настраиваются в `.env`
 - Для L3: capability `NET_ADMIN`, желательно `network_mode: host`
 
@@ -214,7 +214,7 @@ sudo nft delete table inet outline_gate   # если осталась
 
 | Переменная | Обязательно | По умолчанию | Описание |
 |------------|-------------|--------------|----------|
-| `OUTLINE_ACCESS_KEY` | да* | — | Ключ `ss://...` |
+| `OUTLINE_ACCESS_KEY` | да* | — | Ключ `ss://...` или `ssconf://...` |
 | `OUTLINE_ACCESS_KEY_FILE` | да* | — | Путь к файлу с ключом в контейнере |
 | `ROUTING_MODE` | нет | `exclude` | `exclude` \| `include` |
 | `BYPASS_CIDRS` | нет | — | Доп. исключения, CSV |

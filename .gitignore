@@ -24,3 +24,14 @@ coverage.html
 
 # Go
 vendor/
+
+# Real compose secrets (template stub may still be tracked historically)
+deploy/compose/secrets/outline_key.txt
+!deploy/compose/secrets/.gitkeep
+
+# Local secret overrides (any *local* key files under compose)
+deploy/compose/secrets/*local*
+deploy/compose/.env
+
+# Accidental nested clone / workdir
+/outline-gate/

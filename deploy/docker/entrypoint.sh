@@ -22,7 +22,7 @@ fi
 
 if [ -z "${OUTLINE_ACCESS_KEY:-}" ]; then
   echo "outline-gate: missing access key." >&2
-  echo "Set OUTLINE_ACCESS_KEY or provide a non-empty OUTLINE_ACCESS_KEY_FILE (ss://...)." >&2
+  echo "Set OUTLINE_ACCESS_KEY or provide a non-empty OUTLINE_ACCESS_KEY_FILE (ss://... or ssconf://...)." >&2
   echo "Example: docker compose + deploy/compose/configure.sh" >&2
   exit 1
 fi

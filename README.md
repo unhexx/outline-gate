@@ -4,7 +4,7 @@ Docker LAN-шлюз к [Outline](https://getoutline.org/) (Shadowsocks): SOCKS5 
 
 ## Возможности
 
-- Клиент Outline через **outline-sdk** (`ss://` access key)
+- Клиент Outline через **outline-sdk** (`ss://` и динамические `ssconf://`)
 - Локальный **SOCKS5** (`:1080`)
 - Опциональный **L3 gateway** (nftables): режимы `exclude` / `include`
 - Параметры и ключ при запуске: `.env`, файл секрета, `docker run -e …`
@@ -63,7 +63,7 @@ docker run --rm -d --name outline-gate \
 
 | Variable | Description |
 |----------|-------------|
-| `OUTLINE_ACCESS_KEY` / `OUTLINE_ACCESS_KEY_FILE` | Ключ Outline (обязательно один из) |
+| `OUTLINE_ACCESS_KEY` / `OUTLINE_ACCESS_KEY_FILE` | Ключ Outline `ss://` или `ssconf://` |
 | `ROUTING_MODE` | `exclude` \| `include` |
 | `BYPASS_CIDRS` / `BYPASS_CIDRS_FILE` | Исключения |
 | `TUNNEL_CIDRS` / `TUNNEL_CIDRS_FILE` | Цели (include) |
@@ -76,14 +76,14 @@ docker run --rm -d --name outline-gate \
 
 ## Репозиторий
 
-Публикация на **git.aservice24.ru**:
+GitHub: https://github.com/unhexx/outline-gate
 
 ```bash
-git remote add origin git@git.aservice24.ru:GROUP/outline-gate.git
-git push -u origin master
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
 ```
 
-Подробный чеклист — в [docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md) §10.
+Подробный чеклист — в [docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md).
 
 ## Безопасность
 
