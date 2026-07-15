@@ -1,0 +1,51 @@
+# Profile A: host network — L3-шлюз (клиенты LAN → IP хоста как default GW)
+#
+#   cp .env.example .env && ./configure.sh
+#   # в .env: GATEWAY_ENABLE=true
+#   docker compose -f docker-compose.host.yml up --build -d
+
+name: outline-gate-host
+
+services:
+  outline-gate:
+    image: ${IMAGE_TAG:-outline-gate:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: outline-gate
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OUTLINE_ACCESS_KEY: ${OUTLINE_ACCESS_KEY:-}
+      OUTLINE_ACCESS_KEY_FILE: ${OUTLINE_ACCESS_KEY_FILE:-/run/secrets/outline_key}
+      ROUTING_MODE: ${ROUTING_MODE:-exclude}
+      BYPASS_CIDRS: ${BYPASS_CIDRS:-}
+      BYPASS_CIDRS_FILE: ${BYPASS_CIDRS_FILE:-/config/bypass.txt}
+      TUNNEL_CIDRS: ${TUNNEL_CIDRS:-}
+      TUNNEL_CIDRS_FILE: ${TUNNEL_CIDRS_FILE:-/config/tunnel.txt}
+      DIRECT_POLICY: ${DIRECT_POLICY:-direct}
+      GATEWAY_ENABLE: ${GATEWAY_ENABLE:-true}
+      LAN_INTERFACE: ${LAN_INTERFACE:-}
+      SOCKS_LISTEN: ${SOCKS_LISTEN:-0.0.0.0:1080}
+      HEALTH_LISTEN: ${HEALTH_LISTEN:-0.0.0.0:8080}
+      TRANSPROXY_LISTEN: ${TRANSPROXY_LISTEN:-127.0.0.1:12345}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      RECONNECT_BASE_DELAY: ${RECONNECT_BASE_DELAY:-1s}
+      RECONNECT_MAX_DELAY: ${RECONNECT_MAX_DELAY:-60s}
+      DNS_MODE: ${DNS_MODE:-system}
+      DNS_SERVERS: ${DNS_SERVERS:-}
+    volumes:
+      - ./config:/config:ro
+      - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

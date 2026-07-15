@@ -1,0 +1,12 @@
+.git
+.bin
+bin
+dist
+**/.env
+**/secrets/outline_key.local.txt
+**/*_test.go
+coverage.out
+.idea
+.vscode
+*.md
+!README.md

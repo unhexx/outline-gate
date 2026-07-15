@@ -1,0 +1,60 @@
+# Profile C: SOCKS (+ optional L3 on bridge; для LAN default-GW см. docker-compose.host.yml)
+#
+# Быстрый старт:
+#   cp .env.example .env && ./configure.sh
+#   docker compose up --build -d
+#
+# Ключ: OUTLINE_ACCESS_KEY в .env  ИЛИ  файл secrets/outline_key.txt
+
+name: outline-gate
+
+services:
+  outline-gate:
+    image: ${IMAGE_TAG:-outline-gate:local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: outline-gate
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Ключ: из .env (OUTLINE_ACCESS_KEY) или из смонтированного файла
+      OUTLINE_ACCESS_KEY: ${OUTLINE_ACCESS_KEY:-}
+      OUTLINE_ACCESS_KEY_FILE: ${OUTLINE_ACCESS_KEY_FILE:-/run/secrets/outline_key}
+      ROUTING_MODE: ${ROUTING_MODE:-exclude}
+      BYPASS_CIDRS: ${BYPASS_CIDRS:-}
+      BYPASS_CIDRS_FILE: ${BYPASS_CIDRS_FILE:-/config/bypass.txt}
+      TUNNEL_CIDRS: ${TUNNEL_CIDRS:-}
+      TUNNEL_CIDRS_FILE: ${TUNNEL_CIDRS_FILE:-/config/tunnel.txt}
+      DIRECT_POLICY: ${DIRECT_POLICY:-direct}
+      GATEWAY_ENABLE: ${GATEWAY_ENABLE:-false}
+      LAN_INTERFACE: ${LAN_INTERFACE:-}
+      SOCKS_LISTEN: ${SOCKS_LISTEN:-0.0.0.0:1080}
+      HEALTH_LISTEN: ${HEALTH_LISTEN:-0.0.0.0:8080}
+      TRANSPROXY_LISTEN: ${TRANSPROXY_LISTEN:-127.0.0.1:12345}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      RECONNECT_BASE_DELAY: ${RECONNECT_BASE_DELAY:-1s}
+      RECONNECT_MAX_DELAY: ${RECONNECT_MAX_DELAY:-60s}
+      DNS_MODE: ${DNS_MODE:-system}
+      DNS_SERVERS: ${DNS_SERVERS:-}
+    volumes:
+      - ./config:/config:ro
+      # Опциональный файл ключа (создайте через configure.sh или вручную).
+      # Если используете только OUTLINE_ACCESS_KEY в .env — файл может быть пустым-заглушкой.
+      - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro
+    ports:
+      - "${HOST_SOCKS_PORT:-1080}:1080"
+      - "${HOST_HEALTH_PORT:-8080}:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

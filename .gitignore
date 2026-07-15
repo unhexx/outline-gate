@@ -1,0 +1,26 @@
+# Binaries
+/bin/
+/dist/
+/outline-gate
+*.exe
+*.test
+
+# Secrets & local env (.env never committed; key file stub is tracked as template)
+.env
+*.key
+# Local overrides of the compose key file (if you replace the stub with a real key,
+# keep it untracked by using secrets/outline_key.local.txt + OUTLINE_KEY_HOST_PATH)
+deploy/compose/secrets/outline_key.local.txt
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Coverage
+coverage.out
+coverage.html
+
+# Go
+vendor/
