@@ -20,7 +20,9 @@ echo "readyz HTTP $code: $(cat /tmp/og-ready.json 2>/dev/null || true)"
 
 if [[ "$code" == "200" ]]; then
   echo "==> SOCKS egress check"
-  curl -fsS --max-time 30 --socks5 "$SOCKS" https://ifconfig.me
+  # Prefer hostname via SOCKS (remote DNS) and force IPv4: v1 is IPv4-only;
+  # plain --socks5 may try AAAA first and fail on IPv6-less paths.
+  curl -4 -fsS --max-time 30 --socks5-hostname "$SOCKS" https://ifconfig.me
   echo
   echo "smoke OK"
 else

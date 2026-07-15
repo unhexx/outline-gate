@@ -109,3 +109,57 @@ func TestSOCKS5Connect(t *testing.T) {
 	}
 	_ = portStr
 }
+
+func TestSOCKS5RejectIPv6(t *testing.T) {
+	s := &SOCKS5{
+		ListenAddr: "127.0.0.1:0",
+		Dialer:     echoDialer{},
+		Timeout:    5 * time.Second,
+	}
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	s.ln = ln
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go s.handle(ctx, conn)
+		}
+	}()
+
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(c, resp); err != nil {
+		t.Fatal(err)
+	}
+	// CONNECT to ::1:80 (IPv6)
+	req := []byte{
+		0x05, 0x01, 0x00, 0x04,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // ::1
+		0, 80,
+	}
+	if _, err := c.Write(req); err != nil {
+		t.Fatal(err)
+	}
+	rep := make([]byte, 10)
+	if _, err := io.ReadFull(c, rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep[0] != 0x05 || rep[1] != 0x08 {
+		t.Fatalf("expected address-type-not-supported (0x08), got %v", rep)
+	}
+}

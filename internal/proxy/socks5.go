@@ -80,7 +80,15 @@ func (s *SOCKS5) Close() error {
 
 func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(s.Timeout))
+	log := s.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	timeout := s.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 
 	// greeting
 	buf := make([]byte, 258)
@@ -123,11 +131,14 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 			return
 		}
 		host = string(buf[:l])
-	case 0x04: // IPv6
+	case 0x04: // IPv6 — not supported in v1 (IPv4-only)
 		if _, err := io.ReadFull(conn, buf[:16]); err != nil {
 			return
 		}
-		host = net.IP(buf[:16]).String()
+		log.Debug("SOCKS IPv6 rejected (v1 is IPv4-only)")
+		// 0x08 = Address type not supported
+		_, _ = conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
 	default:
 		_, _ = conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
@@ -138,11 +149,11 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	port := binary.BigEndian.Uint16(buf[:2])
 	target := net.JoinHostPort(host, strconv.Itoa(int(port)))
 
-	dctx, cancel := context.WithTimeout(ctx, s.Timeout)
+	dctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	remote, err := s.Dialer.DialContext(dctx, "tcp", target)
 	if err != nil {
-		s.Logger.Debug("SOCKS dial failed", "target", target, "err", err)
+		log.Debug("SOCKS dial failed", "target", target, "err", err)
 		_, _ = conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
