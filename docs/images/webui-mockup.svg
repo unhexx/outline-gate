@@ -1,43 +1,76 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520" role="img" aria-label="Web UI outline-gate">
-  <rect width="720" height="520" rx="12" fill="#0f1419"/>
-  <!-- browser chrome -->
-  <rect x="24" y="24" width="672" height="472" rx="10" fill="#1a2332" stroke="#2a3548"/>
-  <rect x="24" y="24" width="672" height="36" rx="10" fill="#121a24"/>
-  <circle cx="48" cy="42" r="5" fill="#f07178"/>
-  <circle cx="66" cy="42" r="5" fill="#e6c07b"/>
-  <circle cx="84" cy="42" r="5" fill="#3dd68c"/>
-  <rect x="120" y="32" width="400" height="20" rx="6" fill="#0f1419"/>
-  <text x="132" y="46" fill="#8b9bb4" font-family="ui-monospace, monospace" font-size="10">http://192.168.1.10:28080/ui/</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="Web UI outline-gate v0.2.0 compact">
+  <rect width="800" height="480" rx="12" fill="#0f1419"/>
+  <rect x="20" y="16" width="760" height="448" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <rect x="20" y="16" width="760" height="32" rx="10" fill="#121a24"/>
+  <circle cx="42" cy="32" r="4" fill="#f07178"/>
+  <circle cx="58" cy="32" r="4" fill="#e6c07b"/>
+  <circle cx="74" cy="32" r="4" fill="#3dd68c"/>
+  <rect x="110" y="24" width="360" height="16" rx="4" fill="#0f1419"/>
+  <text x="120" y="35" fill="#8b9bb4" font-family="ui-monospace,monospace" font-size="9">http://host:28080/ui/</text>
 
-  <text x="48" y="90" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">outline-gate</text>
-  <text x="48" y="110" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">Исключения VPN · ключ Outline · SOCKS + L3</text>
+  <!-- brand -->
+  <rect x="36" y="60" width="22" height="22" rx="6" fill="#1a2332" stroke="#3d8bfd"/>
+  <circle cx="47" cy="72" r="3" fill="#3d8bfd"/>
+  <text x="66" y="70" fill="#e7ecf3" font-family="Segoe UI,system-ui,sans-serif" font-size="14" font-weight="650">outline-gate</text>
+  <text x="168" y="70" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">v0.2.0</text>
+  <text x="66" y="84" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">split-tunnel · live log · SOCKS + L3</text>
 
-  <!-- token card -->
-  <rect x="48" y="128" width="624" height="70" rx="8" fill="#121a24" stroke="#2a3548"/>
-  <text x="64" y="150" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">Токен доступа (UI_TOKEN)</text>
-  <rect x="64" y="158" width="400" height="26" rx="6" fill="#0f1419" stroke="#2a3548"/>
-  <text x="76" y="176" fill="#5a6a82" font-family="ui-monospace, monospace" font-size="11">••••••••••••••••</text>
-  <rect x="480" y="158" width="100" height="26" rx="6" fill="#3d8bfd"/>
-  <text x="530" y="176" text-anchor="middle" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="600">Сохранить</text>
+  <rect x="620" y="62" width="72" height="18" rx="9" fill="#1a3d2a"/>
+  <text x="656" y="74" text-anchor="middle" fill="#3dd68c" font-family="Segoe UI,system-ui,sans-serif" font-size="9" font-weight="600">VPN ready</text>
+  <rect x="700" y="62" width="58" height="18" rx="9" fill="#121a24" stroke="#2a3548"/>
+  <text x="729" y="74" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">auth</text>
 
-  <!-- key card -->
-  <rect x="48" y="214" width="624" height="100" rx="8" fill="#121a24" stroke="#2a3548"/>
-  <text x="64" y="238" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Ключ Outline</text>
-  <text x="64" y="258" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">ключ: ss://***@66.x.x.x:11098 · ready: да · server: 66.x.x.x</text>
-  <rect x="64" y="270" width="480" height="28" rx="6" fill="#0f1419" stroke="#2a3548"/>
-  <text x="76" y="288" fill="#5a6a82" font-family="ui-monospace, monospace" font-size="10">ss://…@host:port</text>
-  <rect x="556" y="270" width="96" height="28" rx="6" fill="#3d8bfd"/>
-  <text x="604" y="288" text-anchor="middle" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="10" font-weight="600">Заменить</text>
+  <!-- tabs -->
+  <text x="40" y="112" fill="#e7ecf3" font-family="Segoe UI,system-ui,sans-serif" font-size="10" font-weight="600">Статус</text>
+  <text x="100" y="112" fill="#3d8bfd" font-family="Segoe UI,system-ui,sans-serif" font-size="10" font-weight="600">Лог</text>
+  <line x1="100" y1="118" x2="124" y2="118" stroke="#3d8bfd" stroke-width="2"/>
+  <text x="150" y="112" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="10" font-weight="600">Bypass</text>
+  <text x="210" y="112" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="10" font-weight="600">Ключ</text>
+  <line x1="36" y1="122" x2="760" y2="122" stroke="#2a3548"/>
 
-  <!-- rules -->
-  <rect x="48" y="330" width="624" height="140" rx="8" fill="#121a24" stroke="#2a3548"/>
-  <text x="64" y="354" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Bypass rules</text>
-  <rect x="64" y="366" width="360" height="26" rx="6" fill="#0f1419" stroke="#2a3548"/>
-  <text x="76" y="383" fill="#5a6a82" font-family="ui-monospace, monospace" font-size="10">*.example.com</text>
-  <rect x="436" y="366" width="90" height="26" rx="6" fill="#3d8bfd"/>
-  <text x="481" y="383" text-anchor="middle" fill="#fff" font-family="Segoe UI, system-ui, sans-serif" font-size="10" font-weight="600">Добавить</text>
+  <!-- filters -->
+  <rect x="36" y="136" width="36" height="16" rx="8" fill="rgba(61,139,253,0.15)" stroke="#3d8bfd"/>
+  <text x="54" y="147" text-anchor="middle" fill="#3d8bfd" font-size="8" font-family="Segoe UI,system-ui,sans-serif">Все</text>
+  <rect x="78" y="136" width="42" height="16" rx="8" fill="none" stroke="#2a3548"/>
+  <text x="99" y="147" text-anchor="middle" fill="#8b9bb4" font-size="8" font-family="Segoe UI,system-ui,sans-serif">VPN</text>
+  <rect x="126" y="136" width="48" height="16" rx="8" fill="none" stroke="#2a3548"/>
+  <text x="150" y="147" text-anchor="middle" fill="#8b9bb4" font-size="8" font-family="Segoe UI,system-ui,sans-serif">Direct</text>
+  <circle cx="720" cy="144" r="3" fill="#3dd68c"/>
+  <text x="728" y="147" fill="#8b9bb4" font-size="8" font-family="Segoe UI,system-ui,sans-serif">live</text>
 
-  <text x="64" y="420" fill="#8b9bb4" font-family="ui-monospace, monospace" font-size="11">10.0.0.0/8          CIDR</text>
-  <text x="64" y="442" fill="#8b9bb4" font-family="ui-monospace, monospace" font-size="11">example.com         домен</text>
-  <text x="64" y="464" fill="#8b9bb4" font-family="ui-monospace, monospace" font-size="11">*.cdn.example.net   маска</text>
+  <!-- log chains -->
+  <rect x="36" y="164" width="728" height="36" rx="6" fill="#0d1218" stroke="#2a3548"/>
+  <rect x="36" y="164" width="3" height="36" rx="1" fill="#3dd68c"/>
+  <text x="48" y="178" fill="#8b9bb4" font-family="ui-monospace,monospace" font-size="9">14:02:01</text>
+  <text x="108" y="178" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">10.0.0.5 → SOCKS →</text>
+  <rect x="248" y="168" width="40" height="14" rx="3" fill="#1a3d2a"/>
+  <text x="268" y="178" text-anchor="middle" fill="#3dd68c" font-size="8" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">VPN</text>
+  <text x="298" y="178" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">→ api.github.com:443  ✓  12ms</text>
+
+  <rect x="36" y="208" width="728" height="36" rx="6" fill="#0d1218" stroke="#2a3548"/>
+  <rect x="36" y="208" width="3" height="36" rx="1" fill="#e6c07b"/>
+  <text x="48" y="222" fill="#8b9bb4" font-family="ui-monospace,monospace" font-size="9">14:02:02</text>
+  <text x="108" y="222" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">10.0.0.5 → SOCKS →</text>
+  <rect x="248" y="212" width="48" height="14" rx="3" fill="#3d3520"/>
+  <text x="272" y="222" text-anchor="middle" fill="#e6c07b" font-size="8" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">Direct</text>
+  <text x="306" y="222" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">→ bank.example:443  ✓  rule: bank.example</text>
+
+  <rect x="36" y="252" width="728" height="36" rx="6" fill="#0d1218" stroke="#2a3548"/>
+  <rect x="36" y="252" width="3" height="36" rx="1" fill="#3dd68c"/>
+  <text x="48" y="266" fill="#8b9bb4" font-family="ui-monospace,monospace" font-size="9">14:02:03</text>
+  <text x="108" y="266" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">10.0.0.8 → L3 →</text>
+  <rect x="228" y="256" width="40" height="14" rx="3" fill="#1a3d2a"/>
+  <text x="248" y="266" text-anchor="middle" fill="#3dd68c" font-size="8" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">VPN</text>
+  <text x="278" y="266" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">→ 1.1.1.1:443  ✓</text>
+
+  <rect x="36" y="296" width="728" height="36" rx="6" fill="#0d1218" stroke="#2a3548"/>
+  <rect x="36" y="296" width="3" height="36" rx="1" fill="#e6c07b"/>
+  <text x="48" y="310" fill="#8b9bb4" font-family="ui-monospace,monospace" font-size="9">14:02:04</text>
+  <text x="108" y="310" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">10.0.0.8 → L3 →</text>
+  <rect x="228" y="300" width="48" height="14" rx="3" fill="#3d3520"/>
+  <text x="252" y="310" text-anchor="middle" fill="#e6c07b" font-size="8" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">Direct</text>
+  <text x="286" y="310" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">→ 8.8.8.8:53  ✓  rule: 8.8.8.8</text>
+
+  <text x="40" y="360" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">Compact UI · path chains · icons · SSE live log · v0.2.0</text>
+  <text x="40" y="380" fill="#5a6a82" font-family="Segoe UI,system-ui,sans-serif" font-size="8">RFC1918 on L3 stays kernel-path (not logged)</text>
 </svg>

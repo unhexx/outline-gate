@@ -1,6 +1,6 @@
 # Routing modes
 
-**Version:** [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
+**Version:** [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
 
 ## Always bypass
 
@@ -12,6 +12,15 @@ Regardless of mode, the following never go through the tunnel:
 - Resolved Outline server IPv4 (auto)
 
 This prevents blackhole loops when the tunnel itself would encapsulate traffic to the proxy server.
+
+### L3: kernel vs userspace
+
+| Destination | Path |
+|-------------|------|
+| `@private` (default reserved ranges) | **kernel** forward (no UI log) |
+| Other TCP | **REDIRECT** → transparent proxy → `routing.Engine` (VPN / Direct / Drop) → **logged** |
+
+User bypass of public IPs/domains is decided in the process (same as SOCKS), so **Direct** appears in the live log.
 
 ### Domains and masks
 

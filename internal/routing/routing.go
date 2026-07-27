@@ -118,6 +118,11 @@ func (e *Engine) ShouldTunnel(dst net.IP) bool {
 	return e.Decide(dst) == PathTunnel
 }
 
+// IsServerIP reports whether dst is a configured Outline server address.
+func (e *Engine) IsServerIP(dst net.IP) bool {
+	return e != nil && e.isServer(dst)
+}
+
 // BypassNets returns the effective bypass set (for nftables).
 func (e *Engine) BypassNets() []net.IPNet {
 	out := append([]net.IPNet(nil), e.Bypass...)

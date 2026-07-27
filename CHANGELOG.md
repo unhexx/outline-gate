@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Published releases: https://github.com/unhexx/outline-gate/releases
 
-## [Unreleased]
+## [0.2.0] — 2026-07-27
 
 ### Added
 
@@ -19,10 +19,15 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 - API: `GET /api/v1/connections`, `GET /api/v1/connections/stream` (SSE; `?token=` for EventSource)
 - API: `GET /api/v1/status` (outline + runtime + per-minute VPN/Direct counts)
 - Bypass match returns rule name for log display (`MatchBypass` / `MatchHostDetail`)
+- L3 **userspace path decision**: non-private TCP (VPN + Direct + Drop) through transparent proxy and logged
+- Compact Web UI icons (logo, favicon, VPN/Direct/Drop, tabs) under `/ui/icons/`
 
 ### Changed
 
-- Web UI redesigned with tabs: **Статус · Лог · Bypass · Ключ**, status pills, filters and pause on the log
+- Web UI: dense layout (~13px), tabs **Статус · Лог · Bypass · Ключ**, status pills, filters, SSE pause
+- nftables: only RFC1918/reserved stay on kernel path; user Direct is no longer skipped by nft `@bypass`
+- Transparent proxy dials Direct or Outline based on `routing.Engine`
+- Docs and mockups updated for live log + L3 userspace routing
 
 ## [0.1.0] — 2026-07-27
 
@@ -52,11 +57,3 @@ First public release of **outline-gate**: Docker LAN gateway to Outline (Shadows
 - SOCKS has **no authentication** — restrict to trusted LAN only
 - Web UI API requires `UI_TOKEN`; health endpoints are open for probes
 - Access keys must not be committed; use `.env` / secrets / UI persist file
-
-### Known limitations
-
-- TCP-first; full UDP not covered in L3 path
-- L3 domain bypass is best-effort (resolved IPs); SOCKS hostname match is reliable
-- IPv6 path is limited (IPv4-oriented nft sets)
-
-[0.1.0]: https://github.com/unhexx/outline-gate/releases/tag/v0.1.0
