@@ -75,6 +75,13 @@ func run() error {
 		rebuildPush func()
 	)
 
+	// getCfg returns the current config under mu (safe vs SIGHUP reload).
+	getCfg := func() *config.Config {
+		mu.Lock()
+		defer mu.Unlock()
+		return cfg
+	}
+
 	rebuildPush = func() {
 		mu.Lock()
 		defer mu.Unlock()
@@ -147,10 +154,11 @@ func run() error {
 			},
 			ConnLog: connStore,
 			Status: func() webui.RuntimeStatus {
+				c := getCfg()
 				return webui.RuntimeStatus{
-					SOCKSListen:   cfg.SOCKSListen,
-					GatewayEnable: cfg.GatewayEnable,
-					HealthListen:  cfg.HealthListen,
+					SOCKSListen:   c.SOCKSListen,
+					GatewayEnable: c.GatewayEnable,
+					HealthListen:  c.HealthListen,
 				}
 			},
 			Token:  cfg.UIToken,
@@ -187,6 +195,11 @@ func run() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				errCh <- fmt.Errorf("outline maintain: panic: %v", r)
+			}
+		}()
 		client.MaintainReady(ctx, func(ready bool) {
 			log.Info("outline ready state", "ready", ready, "server_ip", client.ServerIP())
 			if ready {
@@ -196,11 +209,12 @@ func run() error {
 	}()
 
 	socks := &proxy.SOCKS5{
-		ListenAddr: cfg.SOCKSListen,
-		Dialer:     client,
-		Bypass:     bypassMgr,
-		ConnLog:    connHook,
-		Logger:     log,
+		ListenAddr:  cfg.SOCKSListen,
+		Dialer:      client,
+		Bypass:      bypassMgr,
+		AllowCIDRs:  cfg.SOCKSAllowCIDRs,
+		ConnLog:     connHook,
+		Logger:      log,
 	}
 	wg.Add(1)
 	go func() {
@@ -234,31 +248,62 @@ func run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			deadline := time.After(60 * time.Second)
-			for {
-				if client.Ready() {
+			// Wait until tunnel is ready or 60s elapses (then apply anyway).
+			deadline := time.Now().Add(60 * time.Second)
+			for !client.Ready() {
+				if ctx.Err() != nil {
+					return
+				}
+				if time.Now().After(deadline) {
+					log.Warn("applying gateway rules without tunnel ready")
 					break
 				}
 				select {
 				case <-ctx.Done():
 					return
-				case <-deadline:
-					log.Warn("applying gateway rules without tunnel ready")
-					goto apply
 				case <-time.After(500 * time.Millisecond):
 				}
 			}
-		apply:
-			rebuildPush()
-			mu.Lock()
-			g := gw
-			mu.Unlock()
-			if g == nil {
+			if ctx.Err() != nil {
 				return
 			}
-			if err := g.Apply(); err != nil {
-				log.Error("gateway apply failed", "err", err)
-				errCh <- fmt.Errorf("gateway: %w", err)
+			rebuildPush()
+
+			c := getCfg()
+			base := c.ReconnectBase
+			maxDelay := c.ReconnectMax
+			if base <= 0 {
+				base = time.Second
+			}
+			if maxDelay < base {
+				maxDelay = 60 * time.Second
+			}
+			delay := base
+			for attempt := 1; ; attempt++ {
+				if ctx.Err() != nil {
+					return
+				}
+				mu.Lock()
+				g := gw
+				mu.Unlock()
+				if g == nil {
+					return
+				}
+				if err := g.Apply(); err == nil {
+					return
+				} else {
+					log.Error("gateway apply failed; will retry",
+						"err", err, "attempt", attempt, "next_in", delay)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(delay):
+				}
+				delay *= 2
+				if delay > maxDelay {
+					delay = maxDelay
+				}
 			}
 		}()
 	}
@@ -327,7 +372,19 @@ func run() error {
 	}
 	_ = socks.Close()
 	cancel()
-	wg.Wait()
+
+	// Bounded wait: Accept() loops exit on closed listeners; stuck handlers
+	// must not block process exit forever.
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		log.Warn("goroutines did not exit in time; continuing shutdown")
+	}
 	return nil
 }
 
