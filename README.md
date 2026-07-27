@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver)](https://github.com/unhexx/outline-gate/releases/latest)
 [![GitHub release date](https://img.shields.io/github/release-date/unhexx/outline-gate)](https://github.com/unhexx/outline-gate/releases/latest)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/unhexx/outline-gate)](go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/unhexx/outline-gate)](https://goreportcard.com/report/github.com/unhexx/outline-gate)
+[![Go Reference](https://pkg.go.dev/badge/github.com/unhexx/outline-gate.svg)](https://pkg.go.dev/github.com/unhexx/outline-gate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-informational)](#сборка-образа)
 [![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
