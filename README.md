@@ -10,9 +10,9 @@
 [![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
 [![Web UI](https://img.shields.io/badge/Web_UI-live_log-3d8bfd)](#web-ui)
 [![L3](https://img.shields.io/badge/L3-userspace_routing-3dd68c)](docs/routing.md)
-[![Version](https://img.shields.io/badge/version-v0.2.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0)
+[![Version](https://img.shields.io/badge/version-v0.3.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.3.0)
 
-**Current release: [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.2.0/outline-gate_linux_amd64)
+**Current release: [v0.3.0](https://github.com/unhexx/outline-gate/releases/tag/v0.3.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.3.0/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -296,7 +296,13 @@ docker run --rm curlimages/curl:latest \
 
 - **Нет пароля SOCKS** в v1 — публиковать `:1080` в интернет **нельзя**.
 - Ограничьте firewall: только LAN / `127.0.0.1`.
+- Опционально: `SOCKS_ALLOW_CIDRS` (CSV) или `SOCKS_ALLOW_CIDRS_FILE` — allowlist **source IP** клиента. Пусто = принимать всех (как раньше).
 - Не коммитьте `.env` с ключами.
+
+```bash
+# только loopback и LAN 10.0.0.0/8
+SOCKS_ALLOW_CIDRS=127.0.0.0/8,10.0.0.0/8
+```
 
 ---
 
@@ -474,7 +480,7 @@ TUNNEL_CIDRS=1.2.3.0/24
 |------|-----------|
 | Протоколы | TCP redirect; **UDP не полный** |
 | Домены в bypass | резолв A/AAAA + refresh (`BYPASS_DNS_REFRESH`); редкие поддомены могут кратко уйти в tunnel |
-| IPv6 | nft path ориентирован на IPv4 |
+| IPv6 | **не туннелируется** L3: nft-сеты `ipv4_addr`, IPv6 CIDR в bypass пропускаются; на dual-stack хосте IPv6 идёт **мимо** Outline (direct). SOCKS IPv6 ATYP отвергается. Полный dual-stack — roadmap |
 | DNS | не «магический tunnel DNS»; настраивайте DNS на клиентах отдельно |
 | Always bypass | RFC1918, CGNAT, link-local, IP сервера Outline |
 
@@ -550,6 +556,7 @@ docker compose up -d --force-recreate
 | `UI_ENABLE` / `UI_TOKEN` | Web UI + API |
 | `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` | Порты на хосте (bridge compose) |
 | `SOCKS_LISTEN` / `HEALTH_LISTEN` | Слушатели в контейнере |
+| `SOCKS_ALLOW_CIDRS` / `_FILE` | Allowlist source IP для SOCKS (пусто = все) |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 
 Полный список: [`deploy/compose/.env.example`](deploy/compose/.env.example).
