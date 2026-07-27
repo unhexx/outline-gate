@@ -32,6 +32,9 @@ deploy/compose/secrets/outline_key.txt
 # Local secret overrides (any *local* key files under compose)
 deploy/compose/secrets/*local*
 deploy/compose/.env
+# Runtime secrets written by Web UI
+deploy/compose/config/outline_key.runtime.txt
+**/outline_key.runtime.txt
 
 # Accidental nested clone / workdir
 /outline-gate/

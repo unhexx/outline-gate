@@ -84,7 +84,10 @@ func (c *Client) Ready() bool {
 // Connect builds the StreamDialer. Safe to call multiple times (replaces dialer).
 // ssconf:// keys are fetched and expanded to ss:// on each Connect (fresh static key).
 func (c *Client) Connect(ctx context.Context) error {
-	key, err := ExpandAccessKey(ctx, c.accessKey)
+	c.mu.RLock()
+	accessKey := c.accessKey
+	c.mu.RUnlock()
+	key, err := ExpandAccessKey(ctx, accessKey)
 	if err != nil {
 		c.ready.Store(false)
 		return fmt.Errorf("outline expand key: %w", err)
@@ -105,6 +108,31 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Unlock()
 	c.ready.Store(true)
 	return nil
+}
+
+// AccessKey returns the current access key (sensitive — avoid logging raw).
+func (c *Client) AccessKey() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.accessKey
+}
+
+// SetAccessKey replaces the Outline access key and reconnects.
+// On failure the previous dialer/key remains until Connect succeeds with the new key;
+// if Connect fails, ready is false and the new key is kept for retry.
+func (c *Client) SetAccessKey(ctx context.Context, accessKey string) error {
+	accessKey = strings.TrimSpace(accessKey)
+	if accessKey == "" {
+		return fmt.Errorf("access key is required")
+	}
+	if !strings.HasPrefix(accessKey, "ss://") && !strings.HasPrefix(accessKey, "ssconf://") {
+		return fmt.Errorf("access key must start with ss:// or ssconf://")
+	}
+	c.mu.Lock()
+	c.accessKey = accessKey
+	c.mu.Unlock()
+	c.ready.Store(false)
+	return c.Connect(ctx)
 }
 
 // DialContext dials address (host:port) over the Outline tunnel (TCP).

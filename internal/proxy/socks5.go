@@ -19,12 +19,23 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
+// BypassChecker reports whether a destination host (name or IP literal)
+// should skip the tunnel and use a direct dial.
+type BypassChecker interface {
+	ShouldBypassHost(host string) bool
+}
+
 // SOCKS5 is a minimal SOCKS5 (no-auth, CONNECT only) server.
 type SOCKS5 struct {
 	ListenAddr string
-	Dialer     Dialer
-	Logger     *slog.Logger
-	Timeout    time.Duration
+	// Dialer is used for tunnelled connections (Outline).
+	Dialer Dialer
+	// DirectDialer is used when Bypass matches; defaults to net.Dialer.
+	DirectDialer Dialer
+	// Bypass optionally selects direct path for excluded hosts/IPs.
+	Bypass BypassChecker
+	Logger *slog.Logger
+	Timeout time.Duration
 
 	ln net.Listener
 }
@@ -151,12 +162,23 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 
 	dctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	remote, err := s.Dialer.DialContext(dctx, "tcp", target)
+	dialer := s.Dialer
+	via := "tunnel"
+	if s.Bypass != nil && s.Bypass.ShouldBypassHost(host) {
+		via = "direct"
+		if s.DirectDialer != nil {
+			dialer = s.DirectDialer
+		} else {
+			dialer = &net.Dialer{}
+		}
+	}
+	remote, err := dialer.DialContext(dctx, "tcp", target)
 	if err != nil {
-		log.Debug("SOCKS dial failed", "target", target, "err", err)
+		log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
 		_, _ = conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
+	log.Debug("SOCKS connect", "target", target, "via", via)
 	defer remote.Close()
 
 	// success

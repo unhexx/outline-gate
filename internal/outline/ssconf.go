@@ -99,12 +99,28 @@ func parseDynamicBody(body string) (string, error) {
 	if strings.HasPrefix(body, "ss://") {
 		return strings.TrimSpace(body), nil
 	}
-	// Outline Manager / outlineaccesskey JSON.
+	// Outline Manager / outlineaccesskey JSON (or provider error object).
 	var j outlineJSON
 	if err := json.Unmarshal([]byte(body), &j); err != nil {
 		return "", fmt.Errorf("ssconf json: %w", err)
 	}
 	if j.Server == "" || j.ServerPort <= 0 || j.Method == "" || j.Password == "" {
+		// Some providers return HTTP 200 with {"error":{"message":"..."}} when the key is revoked.
+		var errBody struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal([]byte(body), &errBody) == nil {
+			msg := strings.TrimSpace(errBody.Error.Message)
+			if msg == "" {
+				msg = strings.TrimSpace(errBody.Message)
+			}
+			if msg != "" {
+				return "", fmt.Errorf("ssconf provider error: %s", msg)
+			}
+		}
 		return "", fmt.Errorf("ssconf json missing server/port/method/password")
 	}
 	userinfo := base64.StdEncoding.EncodeToString([]byte(j.Method + ":" + j.Password))

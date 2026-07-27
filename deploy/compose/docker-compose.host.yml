@@ -39,8 +39,13 @@ services:
       RECONNECT_MAX_DELAY: ${RECONNECT_MAX_DELAY:-60s}
       DNS_MODE: ${DNS_MODE:-system}
       DNS_SERVERS: ${DNS_SERVERS:-}
+      UI_ENABLE: ${UI_ENABLE:-false}
+      UI_TOKEN: ${UI_TOKEN:-}
+      BYPASS_RULES_FILE: ${BYPASS_RULES_FILE:-/config/bypass.rules.txt}
+      BYPASS_DNS_REFRESH: ${BYPASS_DNS_REFRESH:-60s}
+      OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
     volumes:
-      - ./config:/config:ro
+      - ./config:/config
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro
     restart: unless-stopped
     healthcheck:

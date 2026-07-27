@@ -49,6 +49,41 @@ func New(cfg *config.Config, serverIPs []net.IP) *Engine {
 	}
 }
 
+// NewWithBypass is like New but uses an explicit bypass list (e.g. static + user + resolved).
+func NewWithBypass(cfg *config.Config, bypass []net.IPNet, serverIPs []net.IP) *Engine {
+	return &Engine{
+		Mode:         cfg.RoutingMode,
+		DirectPolicy: cfg.DirectPolicy,
+		Bypass:       append([]net.IPNet(nil), bypass...),
+		Tunnel:       append([]net.IPNet(nil), cfg.TunnelCIDRs...),
+		ServerIPs:    append([]net.IP(nil), serverIPs...),
+	}
+}
+
+// WithBypass returns a shallow copy with a new bypass list.
+func (e *Engine) WithBypass(bypass []net.IPNet) *Engine {
+	if e == nil {
+		return nil
+	}
+	cp := *e
+	cp.Bypass = append([]net.IPNet(nil), bypass...)
+	cp.ServerIPs = append([]net.IP(nil), e.ServerIPs...)
+	cp.Tunnel = append([]net.IPNet(nil), e.Tunnel...)
+	return &cp
+}
+
+// WithServerIPs returns a shallow copy with updated Outline server IPs.
+func (e *Engine) WithServerIPs(serverIPs []net.IP) *Engine {
+	if e == nil {
+		return nil
+	}
+	cp := *e
+	cp.Bypass = append([]net.IPNet(nil), e.Bypass...)
+	cp.ServerIPs = append([]net.IP(nil), serverIPs...)
+	cp.Tunnel = append([]net.IPNet(nil), e.Tunnel...)
+	return &cp
+}
+
 // Decide returns the path for dst (IPv4 preferred).
 func (e *Engine) Decide(dst net.IP) Path {
 	if dst == nil {

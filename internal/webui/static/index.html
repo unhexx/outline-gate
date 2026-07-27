@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>outline-gate — исключения VPN</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>outline-gate</h1>
+      <p class="muted">Управление исключениями VPN и ключом Outline. Bypass: IP, CIDR, домены, <code>*.example.com</code> (L3 + SOCKS5).</p>
+    </header>
+
+    <section class="card auth" id="auth-panel">
+      <label for="token">Токен доступа (UI_TOKEN)</label>
+      <div class="row">
+        <input id="token" type="password" autocomplete="current-password" placeholder="токен" />
+        <button type="button" id="btn-save-token">Сохранить</button>
+        <button type="button" id="btn-clear-token" class="ghost">Сбросить</button>
+      </div>
+      <p class="hint">Токен хранится только в sessionStorage браузера.</p>
+    </section>
+
+    <section class="card">
+      <h2>Ключ Outline</h2>
+      <p id="outline-status" class="muted">—</p>
+      <form id="key-form">
+        <label for="access-key">Новый access key (<code>ss://</code> или <code>ssconf://</code>)</label>
+        <textarea id="access-key" rows="3" placeholder="ss://…@host:port" autocomplete="off" spellcheck="false"></textarea>
+        <div class="row" style="margin-top:0.6rem">
+          <button type="submit">Заменить ключ</button>
+        </div>
+      </form>
+      <p id="key-error" class="error" hidden></p>
+      <p id="key-ok" class="hint" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Добавить правило bypass</h2>
+      <form id="add-form" class="row">
+        <input id="rule-input" type="text" placeholder="8.8.8.8 / 10.0.0.0/8 / example.com / *.cdn.net" required />
+        <button type="submit">Добавить</button>
+      </form>
+      <p id="form-error" class="error" hidden></p>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>Список</h2>
+        <div class="row">
+          <button type="button" id="btn-refresh" class="ghost">Обновить</button>
+          <button type="button" id="btn-apply" class="ghost">Применить DNS</button>
+        </div>
+      </div>
+      <p id="status" class="muted"></p>
+      <table>
+        <thead>
+          <tr><th>Правило</th><th>Тип</th><th></th></tr>
+        </thead>
+        <tbody id="rules-body">
+          <tr><td colspan="3" class="muted">Загрузка…</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Эффективный bypass (IP)</h2>
+      <p class="muted">Системные defaults + user CIDR/IP + resolved домены (для L3).</p>
+      <pre id="effective" class="code">—</pre>
+    </section>
+
+    <footer class="muted">
+      L3: домены резолвятся периодически (best-effort). SOCKS: матч по имени надёжнее.
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

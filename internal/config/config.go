@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -57,6 +58,18 @@ type Config struct {
 	TransproxyListen string
 	// TransproxyPort is the port component of TransproxyListen (for nftables).
 	TransproxyPort int
+
+	// UIEnable turns on the embedded bypass management UI and API.
+	UIEnable bool
+	// UIToken is required when UIEnable is true (Bearer or Basic password).
+	UIToken string
+	// BypassRulesFile is the path to user-managed bypass rules (IP/CIDR/domain).
+	BypassRulesFile string
+	// BypassDNSRefresh is how often domain rules are re-resolved for L3.
+	BypassDNSRefresh time.Duration
+	// AccessKeyPersistFile is where the UI writes a replaced Outline key (survives restart).
+	// Loaded with highest priority when non-empty.
+	AccessKeyPersistFile string
 }
 
 // Load reads configuration from the process environment.
@@ -80,6 +93,10 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		DNSMode:          DNSSystem,
 		TransproxyListen: "127.0.0.1:12345",
 		TransproxyPort:   12345,
+		UIEnable:             false,
+		BypassRulesFile:      "/config/bypass.rules.txt",
+		BypassDNSRefresh:     60 * time.Second,
+		AccessKeyPersistFile: "/config/outline_key.runtime.txt",
 	}
 
 	key, err := loadAccessKey(getenv)
@@ -139,6 +156,29 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		}
 		cfg.ReconnectMax = d
 	}
+	if v := strings.TrimSpace(getenv("UI_ENABLE")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("UI_ENABLE: %w", err)
+		}
+		cfg.UIEnable = b
+	}
+	if v := strings.TrimSpace(getenv("UI_TOKEN")); v != "" {
+		cfg.UIToken = v
+	}
+	if v := strings.TrimSpace(getenv("BYPASS_RULES_FILE")); v != "" {
+		cfg.BypassRulesFile = v
+	}
+	if v := strings.TrimSpace(getenv("BYPASS_DNS_REFRESH")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("BYPASS_DNS_REFRESH: %w", err)
+		}
+		cfg.BypassDNSRefresh = d
+	}
+	if v := strings.TrimSpace(getenv("OUTLINE_KEY_PERSIST_FILE")); v != "" {
+		cfg.AccessKeyPersistFile = v
+	}
 
 	bypass, err := loadCIDRs(getenv, "BYPASS_CIDRS", "BYPASS_CIDRS_FILE")
 	if err != nil {
@@ -170,6 +210,17 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 }
 
 func loadAccessKey(getenv func(string) string) (string, error) {
+	// UI-persisted key wins so runtime key changes survive container restarts.
+	persistPath := strings.TrimSpace(getenv("OUTLINE_KEY_PERSIST_FILE"))
+	if persistPath == "" {
+		persistPath = "/config/outline_key.runtime.txt"
+	}
+	if b, err := os.ReadFile(persistPath); err == nil {
+		if key := firstNonCommentLine(string(b)); key != "" {
+			return key, nil
+		}
+	}
+
 	if v := strings.TrimSpace(getenv("OUTLINE_ACCESS_KEY")); v != "" {
 		return v, nil
 	}
@@ -185,6 +236,32 @@ func loadAccessKey(getenv func(string) string) (string, error) {
 		return key, nil
 	}
 	return "", fmt.Errorf("OUTLINE_ACCESS_KEY or OUTLINE_ACCESS_KEY_FILE is required")
+}
+
+// PersistAccessKey writes the access key to path atomically (for UI key replace).
+func PersistAccessKey(path, key string) error {
+	path = strings.TrimSpace(path)
+	key = strings.TrimSpace(key)
+	if path == "" {
+		return fmt.Errorf("persist path is empty")
+	}
+	if key == "" {
+		return fmt.Errorf("access key is empty")
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	content := "# outline-gate runtime access key (managed by UI/API)\n" + key + "\n"
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(content), 0o600); err != nil {
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
 }
 
 func loadCIDRs(getenv func(string) string, envKey, fileKey string) ([]net.IPNet, error) {
@@ -352,6 +429,12 @@ func (c *Config) Validate() error {
 	}
 	if _, _, err := net.SplitHostPort(c.HealthListen); err != nil {
 		return fmt.Errorf("HEALTH_LISTEN: %w", err)
+	}
+	if c.UIEnable && strings.TrimSpace(c.UIToken) == "" {
+		return fmt.Errorf("UI_TOKEN is required when UI_ENABLE=true")
+	}
+	if c.BypassDNSRefresh <= 0 {
+		return fmt.Errorf("BYPASS_DNS_REFRESH must be positive")
 	}
 	return nil
 }
