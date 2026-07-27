@@ -19,45 +19,57 @@ func NewMatcher(rules []Rule) *Matcher {
 
 // MatchHost reports whether host (domain or IP literal) matches a bypass rule.
 func (m *Matcher) MatchHost(host string) bool {
+	ok, _ := m.MatchHostDetail(host)
+	return ok
+}
+
+// MatchHostDetail is like MatchHost but also returns the matched rule Raw (if any).
+func (m *Matcher) MatchHostDetail(host string) (bool, string) {
 	if m == nil {
-		return false
+		return false, ""
 	}
 	host = NormalizeHost(host)
 	if host == "" {
-		return false
+		return false, ""
 	}
 	if ip := net.ParseIP(host); ip != nil {
-		return m.MatchIP(ip)
+		return m.MatchIPDetail(ip)
 	}
 	for _, r := range m.rules {
 		switch r.Kind {
 		case KindDomain:
 			if host == r.Host {
-				return true
+				return true, r.Raw
 			}
 		case KindSuffix:
 			if host == r.Host || strings.HasSuffix(host, "."+r.Host) {
-				return true
+				return true, r.Raw
 			}
 		}
 	}
-	return false
+	return false, ""
 }
 
 // MatchIP reports whether ip is covered by an IP/CIDR rule.
 func (m *Matcher) MatchIP(ip net.IP) bool {
+	ok, _ := m.MatchIPDetail(ip)
+	return ok
+}
+
+// MatchIPDetail is like MatchIP but also returns the matched rule Raw (if any).
+func (m *Matcher) MatchIPDetail(ip net.IP) (bool, string) {
 	if m == nil || ip == nil {
-		return false
+		return false, ""
 	}
 	if v4 := ip.To4(); v4 != nil {
 		ip = v4
 	}
 	for _, r := range m.rules {
 		if r.Net != nil && r.Net.Contains(ip) {
-			return true
+			return true, r.Raw
 		}
 	}
-	return false
+	return false, ""
 }
 
 // Rules returns a copy of the rules.

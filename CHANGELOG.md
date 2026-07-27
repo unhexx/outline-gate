@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Published releases: https://github.com/unhexx/outline-gate/releases
 
+## [Unreleased]
+
+### Added
+
+- Live **connection routing log** in Web UI (tab **Лог**): path chains `client → SOCKS|L3 → VPN|Direct → host`
+- In-memory `connlog` ring buffer (~500 events) from SOCKS5 and L3 transparent proxy
+- API: `GET /api/v1/connections`, `GET /api/v1/connections/stream` (SSE; `?token=` for EventSource)
+- API: `GET /api/v1/status` (outline + runtime + per-minute VPN/Direct counts)
+- Bypass match returns rule name for log display (`MatchBypass` / `MatchHostDetail`)
+
+### Changed
+
+- Web UI redesigned with tabs: **Статус · Лог · Bypass · Ключ**, status pills, filters and pause on the log
+
 ## [0.1.0] — 2026-07-27
 
 First public release of **outline-gate**: Docker LAN gateway to Outline (Shadowsocks).

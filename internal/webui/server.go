@@ -24,10 +24,19 @@ type Manager interface {
 	Refresh(ctx context.Context) error
 }
 
+// RuntimeStatus is optional process info for the status tab.
+type RuntimeStatus struct {
+	SOCKSListen   string
+	GatewayEnable bool
+	HealthListen  string
+}
+
 // Server serves /ui/ and /api/v1/*.
 type Server struct {
 	Manager Manager
 	Outline OutlineController // optional: key status / replace
+	ConnLog ConnLog           // optional: live connection log
+	Status  func() RuntimeStatus
 	Token   string
 	Static  fs.FS // usually //go:embed static
 }
@@ -47,6 +56,12 @@ func (s *Server) Mount(mux *http.ServeMux) {
 		mux.Handle("/api/v1/outline", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
 		mux.Handle("/api/v1/outline/", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
 	}
+	if s.ConnLog != nil {
+		connAPI := http.HandlerFunc(s.routeConnectionsAPI)
+		mux.Handle("/api/v1/connections", tokenAuth(s.Token, connAPI))
+		mux.Handle("/api/v1/connections/", tokenAuth(s.Token, connAPI))
+	}
+	mux.Handle("/api/v1/status", tokenAuth(s.Token, http.HandlerFunc(s.handleStatus)))
 
 	var static http.Handler
 	if s.Static != nil {

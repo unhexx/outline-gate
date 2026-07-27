@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -17,8 +18,11 @@ import (
 type Transparent struct {
 	ListenAddr string
 	Dialer     Dialer
-	Logger     *slog.Logger
-	Timeout    time.Duration
+	// ConnLog optionally records each connection for the live UI log.
+	// L3 bypass (nft) never reaches this proxy, so events are always via tunnel.
+	ConnLog ConnRecorder
+	Logger  *slog.Logger
+	Timeout time.Duration
 
 	ln net.Listener
 }
@@ -75,6 +79,7 @@ func (t *Transparent) Close() error {
 func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
+	clientIP := clientIPOf(conn)
 	orig, err := originalDST(conn)
 	if err != nil {
 		t.Logger.Debug("SO_ORIGINAL_DST failed", "err", err)
@@ -82,15 +87,37 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 	}
 	t.Logger.Debug("transparent connect", "orig", orig)
 
+	host, portStr, _ := net.SplitHostPort(orig)
+	port := 0
+	if p, err := strconv.Atoi(portStr); err == nil {
+		port = p
+	}
+
 	dctx, cancel := context.WithTimeout(ctx, t.Timeout)
 	defer cancel()
+	start := time.Now()
 	remote, err := t.Dialer.DialContext(dctx, "tcp", orig)
+	dur := time.Since(start).Milliseconds()
 	if err != nil {
 		t.Logger.Debug("transparent dial failed", "target", orig, "err", err)
+		t.record(ConnEvent{
+			Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
+			Via: "tunnel", OK: false, Error: err.Error(), DurationMs: dur,
+		})
 		return
 	}
+	t.record(ConnEvent{
+		Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
+		Via: "tunnel", OK: true, DurationMs: dur,
+	})
 	defer remote.Close()
 	relay(conn, remote)
+}
+
+func (t *Transparent) record(e ConnEvent) {
+	if t.ConnLog != nil {
+		t.ConnLog.RecordConnect(e)
+	}
 }
 
 // originalDST recovers the pre-REDIRECT destination (IPv4).
