@@ -217,8 +217,14 @@ sudo nft delete table inet outline_gate   # если осталась
 | `OUTLINE_ACCESS_KEY` | да* | — | Ключ `ss://...` или `ssconf://...` |
 | `OUTLINE_ACCESS_KEY_FILE` | да* | — | Путь к файлу с ключом в контейнере |
 | `ROUTING_MODE` | нет | `exclude` | `exclude` \| `include` |
-| `BYPASS_CIDRS` | нет | — | Доп. исключения, CSV |
+| `BYPASS_CIDRS` | нет | — | Статические CIDR-исключения, CSV |
 | `BYPASS_CIDRS_FILE` | нет | `/config/bypass.txt` | Файл CIDR (по строке) |
+| `BYPASS_RULES_FILE` | нет | `/config/bypass.rules.txt` | User-правила UI: IP/CIDR/домены/`*.mask` |
+| `BYPASS_DNS_REFRESH` | нет | `60s` | Период DNS-резолва доменов для L3 |
+| `UI_ENABLE` | нет | `false` | Web UI `/ui/` и API |
+| `UI_TOKEN` | при UI | — | Токен (Bearer или Basic password) |
+| `OUTLINE_KEY_PERSIST_FILE` | нет | `/config/outline_key.runtime.txt` | Ключ после замены в UI (приоритет при старте) |
+| `HOST_HEALTH_PORT` | нет | `8080` | Порт health/UI на хосте (bridge) |
 | `TUNNEL_CIDRS` | для include | — | Цели туннеля, CSV |
 | `TUNNEL_CIDRS_FILE` | для include | `/config/tunnel.txt` | Файл CIDR |
 | `DIRECT_POLICY` | нет | `direct` | `direct` \| `drop` (include) |
@@ -237,7 +243,66 @@ sudo nft delete table inet outline_gate   # если осталась
 
 \* Нужен **хотя бы один** способ передать ключ.
 
-Файлы списков: `deploy/compose/config/bypass.txt`, `tunnel.txt` (монтируются в `/config`).
+Файлы списков: `deploy/compose/config/bypass.txt`, `bypass.rules.txt`, `tunnel.txt` (монтируются в `/config`, **rw** — UI пишет rules).
+
+### 7.1. Web UI (bypass + ключ Outline)
+
+В `.env`:
+
+```bash
+UI_ENABLE=true
+UI_TOKEN=длинный-случайный-секрет
+HOST_HEALTH_PORT=28080   # любой свободный порт хоста → контейнер :8080
+```
+
+```bash
+docker compose up --build -d
+```
+
+Откройте:
+
+```text
+http://IP-хоста:28080/ui/
+```
+
+Введите `UI_TOKEN`. В интерфейсе:
+
+1. **Ключ Outline** — вставка `ss://` / `ssconf://`, «Заменить ключ» (reconnect + запись в `OUTLINE_KEY_PERSIST_FILE`).
+2. **Bypass** — IP / CIDR / домен / `*.suffix`.
+
+| Пример bypass | Значение |
+|---------------|----------|
+| `8.8.8.8` | один IP |
+| `203.0.113.0/24` | подсеть |
+| `example.com` | точный домен |
+| `*.cdn.example.net` | домен и поддомены (SOCKS; L3 — DNS apex) |
+
+API (тот же токен; порт = `HOST_HEALTH_PORT`):
+
+```bash
+PORT=28080
+# статус ключа (redacted)
+curl -s -H "Authorization: Bearer $UI_TOKEN" http://127.0.0.1:$PORT/api/v1/outline
+
+# заменить ключ
+curl -s -X PUT -H "Authorization: Bearer $UI_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"access_key":"ss://...@host:port"}' \
+  http://127.0.0.1:$PORT/api/v1/outline
+
+# список bypass
+curl -s -H "Authorization: Bearer $UI_TOKEN" http://127.0.0.1:$PORT/api/v1/bypass
+
+# добавить правило
+curl -s -X POST -H "Authorization: Bearer $UI_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"rule":"*.example.com"}' \
+  http://127.0.0.1:$PORT/api/v1/bypass
+```
+
+`/healthz` и `/readyz` **без** токена (для healthcheck).
+
+**Приоритет ключа при старте:** `OUTLINE_KEY_PERSIST_FILE` → `OUTLINE_ACCESS_KEY` → `OUTLINE_ACCESS_KEY_FILE`.
 
 ---
 
@@ -255,6 +320,7 @@ curl -s http://127.0.0.1:8080/readyz | jq .
 |----------|--------|
 | `GET /healthz` | процесс жив |
 | `GET /readyz` | dialer Outline готов (+ gateway rules, если включены) |
+| `GET /ui/` | Web UI списка исключений (если `UI_ENABLE=true`) |
 
 ### 8.2. Смена ключа / режима
 
@@ -296,6 +362,7 @@ docker compose up --build -d
 - Не коммитьте `.env` и реальные ключи.
 - Ключ в логах редактируется (`ss://***@host:port`).
 - Ограничьте доступ к `:8080`, если не нужен снаружи.
+- При `UI_ENABLE=true` обязательно задайте сильный `UI_TOKEN`; API без токена отвечает 401. UI-страница публична (секретов нет), данные меняются только через API с токеном.
 
 ### 8.6. Типовые проблемы
 

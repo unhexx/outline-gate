@@ -19,6 +19,8 @@ LAN clients ──► outline-gate ──ss://──► Outline Server
 | `internal/proxy` | SOCKS5 + transparent TCP (SO_ORIGINAL_DST) |
 | `internal/routing` | Pure decision engine |
 | `internal/gateway` | nftables apply/flush |
+| `internal/bypass` | User rules (IP/CIDR/domain), DNS resolve, matcher |
+| `internal/webui` | Embedded UI `/ui/` + API `/api/v1/bypass` |
 | `internal/health` | `/healthz`, `/readyz` |
 
 ## Data path (L3)

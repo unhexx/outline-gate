@@ -43,8 +43,15 @@ services:
       RECONNECT_MAX_DELAY: ${RECONNECT_MAX_DELAY:-60s}
       DNS_MODE: ${DNS_MODE:-system}
       DNS_SERVERS: ${DNS_SERVERS:-}
+      # Web UI для списка исключений (bypass). Требует UI_TOKEN.
+      UI_ENABLE: ${UI_ENABLE:-false}
+      UI_TOKEN: ${UI_TOKEN:-}
+      BYPASS_RULES_FILE: ${BYPASS_RULES_FILE:-/config/bypass.rules.txt}
+      BYPASS_DNS_REFRESH: ${BYPASS_DNS_REFRESH:-60s}
+      OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
     volumes:
-      - ./config:/config:ro
+      # rw: UI/API пишет bypass.rules.txt; static CIDR-файлы тоже здесь
+      - ./config:/config
       # Опциональный файл ключа (создайте через configure.sh или вручную).
       # Если используете только OUTLINE_ACCESS_KEY в .env — файл может быть пустым-заглушкой.
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro

@@ -1,0 +1,2 @@
+# User bypass rules (managed by Web UI / API when UI_ENABLE=true)
+# One entry per line: IP, CIDR, domain, or *.suffix

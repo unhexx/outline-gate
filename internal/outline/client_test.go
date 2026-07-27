@@ -98,3 +98,14 @@ func TestParseDynamicBody_SSText(t *testing.T) {
 		t.Fatalf("got %q err=%v", ss, err)
 	}
 }
+
+func TestParseDynamicBody_ProviderError(t *testing.T) {
+	body := `{"error":{"message":"access key deleted"}}`
+	_, err := parseDynamicBody(body)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "access key deleted") {
+		t.Fatalf("want provider message in error, got %v", err)
+	}
+}

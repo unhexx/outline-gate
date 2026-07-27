@@ -21,6 +21,12 @@ type Server struct {
 
 // Handler returns the HTTP handler.
 func (s *Server) Handler() http.Handler {
+	return s.Mux()
+}
+
+// Mux returns the serve mux with health routes registered.
+// Callers may attach additional routes (e.g. management UI) before serving.
+func (s *Server) Mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.handleLive)
 	mux.HandleFunc("/readyz", s.handleReady)
@@ -68,5 +74,6 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	_, _ = w.Write([]byte("outline-gate\n"))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("outline-gate\nhealth: /healthz /readyz\nui: /ui/\n"))
 }

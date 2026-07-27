@@ -115,6 +115,25 @@ func TestLoadFromEnv_InvalidMode(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnv_UIRequiresToken(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"UI_ENABLE":          "true",
+	}
+	_, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err == nil {
+		t.Fatal("expected UI_TOKEN required")
+	}
+	env["UI_TOKEN"] = "s3cret"
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.UIEnable || cfg.UIToken != "s3cret" {
+		t.Fatalf("%+v", cfg)
+	}
+}
+
 func TestParseCIDROrIP(t *testing.T) {
 	n, err := ParseCIDROrIP("10.1.2.3")
 	if err != nil {
