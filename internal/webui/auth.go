@@ -21,27 +21,29 @@ func tokenAuth(token string, next http.Handler) http.Handler {
 
 func checkToken(r *http.Request, want string) bool {
 	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		// also allow query for simple browser asset loads is NOT done — use Bearer from JS
-		return false
-	}
-	const bearer = "Bearer "
-	if strings.HasPrefix(auth, bearer) {
-		got := strings.TrimSpace(auth[len(bearer):])
-		return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
-	}
-	const basic = "Basic "
-	if strings.HasPrefix(auth, basic) {
-		raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(auth[len(basic):]))
-		if err != nil {
-			return false
+	if auth != "" {
+		const bearer = "Bearer "
+		if strings.HasPrefix(auth, bearer) {
+			got := strings.TrimSpace(auth[len(bearer):])
+			return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 		}
-		// user:password — password must match token (user ignored)
-		parts := strings.SplitN(string(raw), ":", 2)
-		if len(parts) != 2 {
-			return false
+		const basic = "Basic "
+		if strings.HasPrefix(auth, basic) {
+			raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(auth[len(basic):]))
+			if err != nil {
+				return false
+			}
+			// user:password — password must match token (user ignored)
+			parts := strings.SplitN(string(raw), ":", 2)
+			if len(parts) != 2 {
+				return false
+			}
+			return subtle.ConstantTimeCompare([]byte(parts[1]), []byte(want)) == 1
 		}
-		return subtle.ConstantTimeCompare([]byte(parts[1]), []byte(want)) == 1
+	}
+	// EventSource cannot set Authorization; allow ?token= for SSE streams only.
+	if q := r.URL.Query().Get("token"); q != "" {
+		return subtle.ConstantTimeCompare([]byte(q), []byte(want)) == 1
 	}
 	return false
 }

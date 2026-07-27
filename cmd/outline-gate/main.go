@@ -15,6 +15,7 @@ import (
 
 	"github.com/unhex/outline-gate/internal/bypass"
 	"github.com/unhex/outline-gate/internal/config"
+	"github.com/unhex/outline-gate/internal/connlog"
 	"github.com/unhex/outline-gate/internal/gateway"
 	"github.com/unhex/outline-gate/internal/health"
 	"github.com/unhex/outline-gate/internal/logging"
@@ -120,6 +121,11 @@ func run() error {
 	}
 	hs.MarkStarted()
 
+	connStore := connlog.New(500)
+	connHook := proxy.NewStoreHook(func(e proxy.ConnEvent) {
+		connStore.FromFields(e.Proto, e.ClientIP, e.Target, e.Host, e.Port, e.Via, e.Rule, e.OK, e.Error, e.DurationMs)
+	})
+
 	mux := hs.Mux()
 	if cfg.UIEnable {
 		ui := &webui.Server{
@@ -137,6 +143,14 @@ func run() error {
 					rebuildPush()
 				},
 				PersistPath: cfg.AccessKeyPersistFile,
+			},
+			ConnLog: connStore,
+			Status: func() webui.RuntimeStatus {
+				return webui.RuntimeStatus{
+					SOCKSListen:   cfg.SOCKSListen,
+					GatewayEnable: cfg.GatewayEnable,
+					HealthListen:  cfg.HealthListen,
+				}
 			},
 			Token:  cfg.UIToken,
 			Static: webui.StaticFS(),
@@ -184,6 +198,7 @@ func run() error {
 		ListenAddr: cfg.SOCKSListen,
 		Dialer:     client,
 		Bypass:     bypassMgr,
+		ConnLog:    connHook,
 		Logger:     log,
 	}
 	wg.Add(1)
@@ -198,6 +213,7 @@ func run() error {
 		tp := &proxy.Transparent{
 			ListenAddr: cfg.TransproxyListen,
 			Dialer:     client,
+			ConnLog:    connHook,
 			Logger:     log,
 		}
 		wg.Add(1)

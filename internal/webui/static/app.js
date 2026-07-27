@@ -1,5 +1,6 @@
 (function () {
   const TOKEN_KEY = "outline_gate_ui_token";
+  const MAX_UI_EVENTS = 500;
 
   const el = {
     token: document.getElementById("token"),
@@ -18,7 +19,30 @@
     accessKey: document.getElementById("access-key"),
     keyError: document.getElementById("key-error"),
     keyOk: document.getElementById("key-ok"),
+    readyPill: document.getElementById("ready-pill"),
+    authPill: document.getElementById("auth-pill"),
+    stReady: document.getElementById("st-ready"),
+    stServer: document.getElementById("st-server"),
+    stKey: document.getElementById("st-key"),
+    stSocks: document.getElementById("st-socks"),
+    stGw: document.getElementById("st-gw"),
+    stRates: document.getElementById("st-rates"),
+    statusError: document.getElementById("status-error"),
+    logList: document.getElementById("log-list"),
+    logEmpty: document.getElementById("log-empty"),
+    logSearch: document.getElementById("log-search"),
+    liveDot: document.getElementById("live-dot"),
+    liveLabel: document.getElementById("live-label"),
+    btnPause: document.getElementById("btn-pause"),
+    btnClearLog: document.getElementById("btn-clear-log"),
   };
+
+  let events = [];
+  let filter = "all";
+  let search = "";
+  let paused = false;
+  let es = null;
+  let stickBottom = true;
 
   function getToken() {
     return sessionStorage.getItem(TOKEN_KEY) || "";
@@ -76,6 +100,65 @@
     el.keyOk.textContent = ok || "";
   }
 
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, "&#39;");
+  }
+
+  function setAuthPill(ok) {
+    if (!getToken()) {
+      el.authPill.textContent = "нет токена";
+      el.authPill.className = "pill pill-muted";
+    } else if (ok) {
+      el.authPill.textContent = "авторизован";
+      el.authPill.className = "pill pill-ok";
+    } else {
+      el.authPill.textContent = "401";
+      el.authPill.className = "pill pill-bad";
+    }
+  }
+
+  function setReadyPill(ready) {
+    if (ready === true) {
+      el.readyPill.textContent = "VPN ready";
+      el.readyPill.className = "pill pill-ok";
+    } else if (ready === false) {
+      el.readyPill.textContent = "VPN down";
+      el.readyPill.className = "pill pill-bad";
+    } else {
+      el.readyPill.textContent = "VPN —";
+      el.readyPill.className = "pill pill-muted";
+    }
+  }
+
+  /* Tabs */
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const name = tab.getAttribute("data-tab");
+      document.querySelectorAll(".tab").forEach((t) => {
+        const on = t === tab;
+        t.classList.toggle("active", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      document.querySelectorAll(".panel").forEach((p) => {
+        const on = p.id === "panel-" + name;
+        p.classList.toggle("active", on);
+        p.hidden = !on;
+      });
+      if (name === "log") {
+        connectStream();
+        renderLog();
+      }
+    });
+  });
+
   function renderOutline(st) {
     if (!st) {
       el.outlineStatus.textContent = "—";
@@ -90,6 +173,26 @@
     el.outlineStatus.textContent = parts.join(" · ");
   }
 
+  function renderStatus(data) {
+    el.statusError.hidden = true;
+    const o = (data && data.outline) || {};
+    setReadyPill(typeof o.ready === "boolean" ? o.ready : null);
+    el.stReady.textContent = o.ready ? "ready" : "not ready";
+    el.stServer.textContent = o.server_ip || "—";
+    el.stKey.textContent = o.access_key_redacted || "—";
+    el.stSocks.textContent = (data && data.socks) || "—";
+    el.stGw.textContent = data && data.gateway ? "включён" : "выкл";
+    const c = (data && data.connlog) || {};
+    if (c.total_1m != null) {
+      el.stRates.textContent =
+        "VPN " + (c.vpn_1m || 0) + " · Direct " + (c.direct_1m || 0) +
+        (c.fail_1m ? " · fail " + c.fail_1m : "");
+    } else {
+      el.stRates.textContent = "—";
+    }
+    renderOutline(o);
+  }
+
   function renderRules(rules) {
     if (!rules || !rules.length) {
       el.rulesBody.innerHTML = '<tr><td colspan="3" class="muted">Список пуст</td></tr>';
@@ -100,7 +203,7 @@
         (r) =>
           `<tr>
             <td><code>${escapeHtml(r.rule)}</code></td>
-            <td>${escapeHtml(kindLabel(r.kind))}</td>
+            <td><span class="kind-badge">${escapeHtml(kindLabel(r.kind))}</span></td>
             <td><button type="button" class="danger" data-rule="${escapeAttr(r.rule)}">Удалить</button></td>
           </tr>`
       )
@@ -110,32 +213,207 @@
     });
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  function viaLabel(via) {
+    return via === "direct" ? "Direct" : "VPN";
   }
 
-  function escapeAttr(s) {
-    return escapeHtml(s).replace(/'/g, "&#39;");
+  function protoLabel(p) {
+    return p === "l3" ? "L3" : "SOCKS";
   }
+
+  function formatTime(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString(undefined, { hour12: false });
+    } catch (_) {
+      return "—";
+    }
+  }
+
+  function eventMatches(e) {
+    if (filter === "vpn" && e.via === "direct") return false;
+    if (filter === "direct" && e.via !== "direct") return false;
+    if (filter === "socks" && e.proto !== "socks") return false;
+    if (filter === "l3" && e.proto !== "l3") return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const hay = ((e.host || "") + " " + (e.target || "") + " " + (e.client_ip || "") + " " + (e.rule || "")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }
+
+  function chainHTML(e) {
+    const via = e.via === "direct" ? "direct" : "tunnel";
+    const cls = ["chain", "via-" + via];
+    if (!e.ok) cls.push("fail");
+    const dest = escapeHtml(e.target || e.host || "—");
+    const client = escapeHtml(e.client_ip || "?");
+    const rule = e.rule ? `<span class="chain-meta">rule: ${escapeHtml(e.rule)}</span>` : "";
+    const dur = e.duration_ms != null ? `<span class="chain-meta">${e.duration_ms}ms</span>` : "";
+    const ok = e.ok
+      ? `<span class="chain-ok" title="ok">✓</span>`
+      : `<span class="chain-fail" title="${escapeAttr(e.error || "fail")}">✗</span>`;
+    const err = !e.ok && e.error ? `<span class="chain-meta">${escapeHtml(e.error)}</span>` : "";
+    return `<div class="${cls.join(" ")}" data-id="${e.id}">
+      <span class="chain-time">${formatTime(e.time)}</span>
+      <span class="chain-node" title="клиент">${client}</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-node">${protoLabel(e.proto)}</span>
+      <span class="chain-arrow">→</span>
+      <span class="badge-via ${via === "direct" ? "direct" : "vpn"}">${viaLabel(via)}</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-dest">${dest}</span>
+      ${ok}
+      ${dur}
+      ${rule}
+      ${err}
+    </div>`;
+  }
+
+  function renderLog() {
+    const filtered = events.filter(eventMatches);
+    const empty = el.logEmpty;
+    if (!filtered.length) {
+      el.logList.innerHTML = "";
+      el.logList.appendChild(empty);
+      empty.hidden = false;
+      empty.textContent = events.length
+        ? "Нет записей по текущему фильтру."
+        : "Пока нет подключений — сделайте запрос через SOCKS или L3.";
+      return;
+    }
+    empty.hidden = true;
+    const wasBottom = stickBottom;
+    el.logList.innerHTML = filtered.map(chainHTML).join("");
+    if (wasBottom && !paused) {
+      el.logList.scrollTop = el.logList.scrollHeight;
+    }
+  }
+
+  function pushEvent(e) {
+    if (!e || e.id == null) return;
+    if (events.some((x) => x.id === e.id)) return;
+    events.push(e);
+    if (events.length > MAX_UI_EVENTS) {
+      events = events.slice(-MAX_UI_EVENTS);
+    }
+    if (!paused) renderLog();
+  }
+
+  function setLive(state) {
+    el.liveDot.classList.remove("on", "paused");
+    if (state === "on") {
+      el.liveDot.classList.add("on");
+      el.liveLabel.textContent = "live";
+    } else if (state === "paused") {
+      el.liveDot.classList.add("paused");
+      el.liveLabel.textContent = "пауза";
+    } else {
+      el.liveLabel.textContent = "offline";
+    }
+  }
+
+  function disconnectStream() {
+    if (es) {
+      es.close();
+      es = null;
+    }
+    setLive("off");
+  }
+
+  function connectStream() {
+    const token = getToken();
+    if (!token) {
+      disconnectStream();
+      return;
+    }
+    if (es) return;
+    const url = "/api/v1/connections/stream?token=" + encodeURIComponent(token);
+    es = new EventSource(url);
+    es.addEventListener("snapshot", (ev) => {
+      try {
+        const arr = JSON.parse(ev.data);
+        events = Array.isArray(arr) ? arr.slice() : [];
+        renderLog();
+      } catch (_) {}
+    });
+    es.addEventListener("conn", (ev) => {
+      try {
+        pushEvent(JSON.parse(ev.data));
+      } catch (_) {}
+    });
+    es.onopen = () => setLive(paused ? "paused" : "on");
+    es.onerror = () => {
+      setLive("off");
+      // browser will retry EventSource
+    };
+  }
+
+  el.logList.addEventListener("scroll", () => {
+    const near =
+      el.logList.scrollHeight - el.logList.scrollTop - el.logList.clientHeight < 40;
+    stickBottom = near;
+  });
+
+  document.querySelectorAll("#log-filters .chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#log-filters .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      filter = chip.getAttribute("data-filter") || "all";
+      renderLog();
+    });
+  });
+
+  el.logSearch.addEventListener("input", () => {
+    search = el.logSearch.value.trim();
+    renderLog();
+  });
+
+  el.btnPause.addEventListener("click", () => {
+    paused = !paused;
+    el.btnPause.textContent = paused ? "Продолжить" : "Пауза";
+    setLive(es ? (paused ? "paused" : "on") : "off");
+    if (!paused) renderLog();
+  });
+
+  el.btnClearLog.addEventListener("click", () => {
+    events = [];
+    renderLog();
+  });
 
   async function loadOutline() {
     try {
       const st = await api("/api/v1/outline");
       renderOutline(st);
+      setReadyPill(st.ready);
+      setAuthPill(true);
     } catch (e) {
       el.outlineStatus.textContent =
         "Ошибка: " + e.message + (e.status === 401 ? " (проверьте токен)" : "");
+      if (e.status === 401) setAuthPill(false);
     }
   }
 
-  async function loadAll() {
+  async function loadStatus() {
+    try {
+      const data = await api("/api/v1/status");
+      renderStatus(data);
+      setAuthPill(true);
+    } catch (e) {
+      el.statusError.hidden = false;
+      el.statusError.textContent =
+        "Ошибка: " + e.message + (e.status === 401 ? " (проверьте токен)" : "");
+      if (e.status === 401) {
+        setAuthPill(false);
+        setReadyPill(null);
+      }
+    }
+  }
+
+  async function loadBypass() {
     showError("");
     el.status.textContent = "Загрузка…";
-    await loadOutline();
     try {
       const list = await api("/api/v1/bypass");
       renderRules(list.rules || []);
@@ -147,19 +425,28 @@
       el.status.textContent =
         "Правил: " + (list.rules || []).length +
         (eff.dns_error ? " · DNS: " + eff.dns_error : " · OK");
+      setAuthPill(true);
     } catch (e) {
       el.status.textContent = "Ошибка: " + e.message + (e.status === 401 ? " (проверьте токен)" : "");
       if (e.status === 401) {
+        setAuthPill(false);
         el.rulesBody.innerHTML = '<tr><td colspan="3" class="muted">Требуется токен</td></tr>';
       }
     }
+  }
+
+  async function loadAll() {
+    await loadStatus();
+    await loadOutline();
+    await loadBypass();
+    connectStream();
   }
 
   async function removeRule(rule) {
     if (!confirm("Удалить " + rule + "?")) return;
     try {
       await api("/api/v1/bypass?rule=" + encodeURIComponent(rule), { method: "DELETE" });
-      await loadAll();
+      await loadBypass();
     } catch (e) {
       showError(e.message);
     }
@@ -167,18 +454,22 @@
 
   el.saveToken.addEventListener("click", () => {
     setToken(el.token.value.trim());
+    disconnectStream();
     loadAll();
   });
   el.clearToken.addEventListener("click", () => {
     el.token.value = "";
     setToken("");
+    disconnectStream();
+    events = [];
+    renderLog();
     loadAll();
   });
-  el.refresh.addEventListener("click", loadAll);
+  el.refresh.addEventListener("click", loadBypass);
   el.apply.addEventListener("click", async () => {
     try {
       await api("/api/v1/bypass/apply", { method: "POST" });
-      await loadAll();
+      await loadBypass();
     } catch (e) {
       showError(e.message);
     }
@@ -194,7 +485,7 @@
         body: JSON.stringify({ rule }),
       });
       el.ruleInput.value = "";
-      await loadAll();
+      await loadBypass();
     } catch (e) {
       showError(e.message);
     }
@@ -216,12 +507,17 @@
       el.accessKey.value = "";
       renderOutline(res.status || res);
       showKeyMsg("", res.warning || "Ключ применён");
-      await loadOutline();
+      await loadStatus();
     } catch (e) {
       showKeyMsg(e.message, "");
     }
   });
 
   el.token.value = getToken();
+  setAuthPill(!!getToken());
   loadAll();
+  // refresh status periodically
+  setInterval(() => {
+    if (getToken()) loadStatus();
+  }, 15000);
 })();

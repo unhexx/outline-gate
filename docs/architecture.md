@@ -21,11 +21,12 @@ See also: [architecture-overview.svg](images/architecture-overview.svg).
 | `cmd/outline-gate` | Lifecycle, signals, wiring |
 | `internal/config` | Env, CIDR files, UI flags, key persist path |
 | `internal/outline` | outline-sdk StreamDialer, server IP, reconnect, `SetAccessKey` |
-| `internal/proxy` | SOCKS5 + transparent TCP (`SO_ORIGINAL_DST`); SOCKS direct on bypass |
+| `internal/proxy` | SOCKS5 + transparent TCP (`SO_ORIGINAL_DST`); SOCKS direct on bypass; connection hooks |
+| `internal/connlog` | In-memory ring buffer of routing events for live UI log |
 | `internal/routing` | Pure decision engine (IP sets) |
 | `internal/gateway` | nftables apply/flush |
 | `internal/bypass` | User rules (IP/CIDR/domain/`*.suffix`), store, DNS refresh, matcher |
-| `internal/webui` | Embedded UI `/ui/` + API `/api/v1/bypass`, `/api/v1/outline` |
+| `internal/webui` | Embedded UI `/ui/` + API `/api/v1/*` (bypass, outline, connections, status) |
 | `internal/health` | `/healthz`, `/readyz` |
 | `internal/logging` | slog setup |
 
@@ -44,6 +45,14 @@ UDP is not fully handled in v0.1.0 (TCP-first). Use SOCKS5 for apps that need fu
 2. If host/IP matches bypass rules → **direct** `net.Dialer`.
 3. Else → Outline dialer.
 4. Domain rules match CONNECT hostname exactly (including `*.suffix`).
+5. Each CONNECT is recorded in `connlog` (`via=tunnel|direct`, optional matched rule).
+
+## Connection log (Web UI)
+
+- Ring buffer (~500 events) in process memory; no disk persistence.
+- Sources: **SOCKS5** (tunnel + direct) and **L3 transparent** (always tunnel — nft bypass never reaches the proxy).
+- API: `GET /api/v1/connections`, `GET /api/v1/connections/stream` (SSE; `?token=` for EventSource).
+- UI tab **Лог** shows path chains: `client → SOCKS|L3 → VPN|Direct → host`.
 
 ## Config reload
 
@@ -57,4 +66,4 @@ UDP is not fully handled in v0.1.0 (TCP-first). Use SOCKS5 for apps that need fu
 | SOCKS5 | none (LAN only) |
 | `/healthz`, `/readyz` | none |
 | `/ui/` static | none |
-| `/api/v1/*` | `UI_TOKEN` (Bearer or Basic password) |
+| `/api/v1/*` | `UI_TOKEN` (Bearer, Basic password, or `?token=` for SSE) |

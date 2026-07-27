@@ -65,6 +65,15 @@ func TestMatcherDomainAndSuffix(t *testing.T) {
 	if m.MatchIP(net.ParseIP("8.8.8.8")) {
 		t.Fatal("non-match ip")
 	}
+
+	ok, rule := m.MatchHostDetail("a.b.cdn.example.net")
+	if !ok || rule != "*.cdn.example.net" {
+		t.Fatalf("MatchHostDetail suffix: ok=%v rule=%q", ok, rule)
+	}
+	ok, rule = m.MatchIPDetail(net.ParseIP("10.1.2.3"))
+	if !ok || rule != "10.0.0.0/8" {
+		t.Fatalf("MatchIPDetail: ok=%v rule=%q", ok, rule)
+	}
 }
 
 func TestDomainsToResolve(t *testing.T) {
