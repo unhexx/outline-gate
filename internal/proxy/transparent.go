@@ -100,7 +100,8 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 	clientIP := clientIPOf(conn)
 	orig, err := originalDST(conn)
 	if err != nil {
-		t.Logger.Debug("SO_ORIGINAL_DST failed", "err", err)
+		// IPv6 REDIRECT uses IP6T_SO_ORIGINAL_DST (not implemented in v1).
+		t.Logger.Warn("SO_ORIGINAL_DST failed", "err", err, "remote", conn.RemoteAddr())
 		return
 	}
 	t.Logger.Debug("transparent connect", "orig", orig)
@@ -157,6 +158,9 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 		Via: via, Rule: rule, OK: true, DurationMs: dur,
 	})
 	defer remote.Close()
+	// Clear any residual deadlines so long-lived relays are not cut short.
+	_ = conn.SetDeadline(time.Time{})
+	_ = remote.SetDeadline(time.Time{})
 	relay(conn, remote)
 }
 
