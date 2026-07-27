@@ -251,8 +251,18 @@ sudo nft delete table inet outline_gate   # если осталась
 | `SOCKS_LISTEN` | нет | `0.0.0.0:1080` | SOCKS5 |
 | `SOCKS_ALLOW_CIDRS` | нет | (пусто = все) | Allowlist source IP клиентов SOCKS (CSV) |
 | `SOCKS_ALLOW_CIDRS_FILE` | нет | — | Файл CIDR source allowlist (по строке) |
-| `METRICS_ENABLE` | нет | `false` | Prometheus text metrics на `/metrics` |
+| `METRICS_ENABLE` | нет | `false` | Prometheus text на `http://<health>/metrics` (без auth) |
 | `HEALTH_LISTEN` | нет | `0.0.0.0:8080` | Health HTTP |
+
+Включение metrics (bridge compose):
+
+```bash
+# в .env
+METRICS_ENABLE=true
+# recreate
+docker compose up -d --force-recreate
+curl -s "http://127.0.0.1:${HOST_HEALTH_PORT:-8080}/metrics" | head
+```
 | `TRANSPROXY_LISTEN` | нет | `127.0.0.1:12345` | REDIRECT target |
 | `LOG_LEVEL` | нет | `info` | debug/info/warn/error |
 | `LOG_FORMAT` | нет | `text` | text/json |
