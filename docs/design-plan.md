@@ -1,5 +1,7 @@
 # Outline Gate — Design & Implementation Plan
 
+> **Status:** historical design document. Shipped release: **[v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0)** (includes Web UI, which was listed as a v1 non-goal below). Prefer [README](../README.md), [CHANGELOG](../CHANGELOG.md), and [OPERATIONS.ru.md](OPERATIONS.ru.md) for current behaviour.
+
 ## Context
 
 **Проблема.** Нужен сетевой шлюз в Docker, который:

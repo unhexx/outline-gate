@@ -1,5 +1,13 @@
 # outline-gate — пошаговая инструкция по развёртыванию и эксплуатации
 
+**Релиз:** [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
+
+| | |
+|--|--|
+| GitHub | https://github.com/unhexx/outline-gate |
+| aservice | https://git.aservice24.ru/scm/expert/outline-gate.git |
+| Ветка релиза | `master` + tags `v*` |
+
 ## 1. Что это
 
 **outline-gate** — Docker-сервис, который:
@@ -7,6 +15,7 @@
 1. Подключается к удалённому **Outline** (Shadowsocks) по access key `ss://...` или динамическому `ssconf://...`.
 2. Отдаёт локальный **SOCKS5** (`:1080`) для приложений и клиентов LAN.
 3. Опционально работает как **L3-шлюз** (nftables): клиенты LAN направляют трафик через хост, сервис решает, что идёт в туннель, а что напрямую.
+4. Отдаёт **Web UI** (`/ui/`) для bypass-списка и замены ключа Outline (с `UI_ENABLE` + `UI_TOKEN`).
 
 | Режим `ROUTING_MODE` | Поведение |
 |----------------------|-----------|
@@ -20,38 +29,42 @@
 - Linux-хост (для L3-шлюза) или любой Docker-хост (для SOCKS)
 - Docker Engine 20+ и Docker Compose v2
 - Access key Outline (`ss://...` или `ssconf://...`) от Outline Manager / провайдера
-- Свободные порты: **1080** (SOCKS), **8080** (health) — настраиваются в `.env`
+- Свободные порты на хосте: **1080** (SOCKS), **health/UI** (`HOST_HEALTH_PORT`, часто `8080` или `28080`)
 - Для L3: capability `NET_ADMIN`, желательно `network_mode: host`
 
 ---
 
 ## 3. Получение кода
 
-### 3.1. Клонирование с git.aservice24.ru
-
-Подставьте свою группу/путь репозитория:
+### 3.1. Релизный тег (рекомендуется)
 
 ```bash
-# SSH (рекомендуется)
-git clone git@git.aservice24.ru:GROUP/outline-gate.git
+# GitHub
+git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
+git checkout v0.1.0
 
-# или HTTPS
-git clone https://git.aservice24.ru/GROUP/outline-gate.git
+# или aservice
+git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
+git checkout v0.1.0
 ```
 
-### 3.2. Если репозиторий уже локально (первая публикация)
+Бинарник Linux amd64 (без Docker):
 
 ```bash
-cd /path/to/outline-gate
-git remote add origin git@git.aservice24.ru:GROUP/outline-gate.git
-# проверить
-git remote -v
-git push -u origin master
+curl -fsSL -o outline-gate \
+  https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64
+chmod +x outline-gate
 ```
 
-Создайте пустой проект на `git.aservice24.ru` **до** `git push`, если сервер не создаёт репозиторий автоматически.
+### 3.2. Клонирование development-ветки
+
+```bash
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
+# master — актуальная линия разработки; releases — git tags v*
+```
 
 ---
 
@@ -85,7 +98,9 @@ OUTLINE_ACCESS_KEY=ss://....@server:port
 ROUTING_MODE=exclude
 GATEWAY_ENABLE=false
 HOST_SOCKS_PORT=1080
-HOST_HEALTH_PORT=8080
+HOST_HEALTH_PORT=28080   # health + Web UI на хосте
+UI_ENABLE=true
+UI_TOKEN=длинный-случайный-секрет
 LOG_LEVEL=info
 ```
 
@@ -133,9 +148,12 @@ docker run --rm -d --name outline-gate \
   -e OUTLINE_ACCESS_KEY='ss://...' \
   -e ROUTING_MODE=exclude \
   -e GATEWAY_ENABLE=false \
+  -e UI_ENABLE=true \
+  -e UI_TOKEN='change-me' \
   -e LOG_LEVEL=info \
-  -p 1080:1080 -p 8080:8080 \
-  outline-gate:local
+  -p 1080:1080 -p 28080:8080 \
+  -v "$PWD/deploy/compose/config:/config" \
+  outline-gate:v0.1.0
 ```
 
 Доп. параметры — любыми `-e ИМЯ=значение` (см. таблицу).

@@ -1,5 +1,7 @@
 # Routing modes
 
+**Version:** [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
+
 ## Always bypass
 
 Regardless of mode, the following never go through the tunnel:
@@ -63,3 +65,11 @@ DIRECT_POLICY=direct
 ## Reload
 
 Send `SIGHUP` to re-read environment/files and rebuild nft sets (process must receive updated env or use list files on a volume).
+
+Web UI / API updates `BYPASS_RULES_FILE` immediately and triggers DNS refresh + nft update when the gateway is active. Outline keys set via UI persist to `OUTLINE_KEY_PERSIST_FILE` and reconnect the dialer without full container recreate.
+
+## Related
+
+- [OPERATIONS.ru.md](OPERATIONS.ru.md) — deploy steps
+- [README.md](../README.md) — SOCKS/L3 practical examples
+- [CHANGELOG.md](../CHANGELOG.md) — release notes
