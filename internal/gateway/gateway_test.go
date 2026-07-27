@@ -73,3 +73,32 @@ func TestDryRunInclude(t *testing.T) {
 		t.Fatal("legacy nft forward drop should be gone")
 	}
 }
+
+func TestUpdateEngineSwapsEngineWithoutApplyWhenInactive(t *testing.T) {
+	cfg := &config.Config{
+		RoutingMode:    config.ModeExclude,
+		DirectPolicy:   config.DirectAllow,
+		BypassCIDRs:    config.DefaultBypassCIDRs(),
+		TransproxyPort: 12345,
+	}
+	eng1 := routing.New(cfg, nil)
+	g := New(cfg, eng1, nil)
+	if g.Active() {
+		t.Fatal("new gateway should be inactive")
+	}
+	eng2 := routing.New(cfg, []net.IP{net.ParseIP("203.0.113.9")})
+	if err := g.UpdateEngine(eng2); err != nil {
+		t.Fatal(err)
+	}
+	// Still inactive: no Apply was performed (no nft).
+	if g.Active() {
+		t.Fatal("UpdateEngine without prior Apply must not mark active")
+	}
+	script, err := g.DryRunScript()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, "add table inet outline_gate") {
+		t.Fatal("script after UpdateEngine should still build")
+	}
+}

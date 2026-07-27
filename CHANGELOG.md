@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Published releases: https://github.com/unhexx/outline-gate/releases
 
+## [0.3.0] — 2026-07-27
+
+### Added
+
+- Optional SOCKS source allowlist: `SOCKS_ALLOW_CIDRS` / `SOCKS_ALLOW_CIDRS_FILE` (reject + `Warn` when outside)
+- Gateway `Apply` retries with exponential backoff (`RECONNECT_BASE_DELAY` / `RECONNECT_MAX_DELAY`) instead of fatal on first nft failure
+- Entrypoint validates access key prefix (`ss://` or `ssconf://`) before starting the process
+
+### Fixed
+
+- Shutdown no longer hangs forever if a goroutine stalls: bounded `wg.Wait` (10s)
+- Config reload (`SIGHUP`) vs Web UI status: all live `cfg` reads go through mutex
+- Transparent proxy logs `Warn` on `SO_ORIGINAL_DST` failure (was silent `Debug`); clears deadlines before relay
+- MaintainReady panics are recovered and reported as fatal errors
+
+### Changed
+
+- Gateway apply loop refactored (no `goto`); process stays up if nft is temporarily unavailable
+- Dockerfile: soft-pin `nftables=~1.1`, comment that transproxy port 12345 is loopback-only
+- Docs: explicit IPv6 L3 gap (IPv4-only nft path; dual-stack IPv6 bypasses tunnel)
+
+### Security
+
+- Documented and implemented optional source CIDR restriction for unauthenticated SOCKS5
+
 ## [0.2.0] — 2026-07-27
 
 ### Added

@@ -59,6 +59,9 @@ type SOCKS5 struct {
 	DirectDialer Dialer
 	// Bypass optionally selects direct path for excluded hosts/IPs.
 	Bypass BypassChecker
+	// AllowCIDRs, when non-empty, accepts only clients whose source IP is in
+	// one of the networks. Empty means allow all (trusted LAN).
+	AllowCIDRs []net.IPNet
 	// ConnLog optionally records each CONNECT for the live UI log.
 	ConnLog ConnRecorder
 	Logger  *slog.Logger
@@ -121,6 +124,11 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	log := s.Logger
 	if log == nil {
 		log = slog.Default()
+	}
+	clientIP := clientIPOf(conn)
+	if len(s.AllowCIDRs) > 0 && !ipAllowed(clientIP, s.AllowCIDRs) {
+		log.Warn("SOCKS connection rejected: source not in allowlist", "client", clientIP)
+		return
 	}
 	timeout := s.Timeout
 	if timeout <= 0 {
@@ -187,7 +195,6 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	port := binary.BigEndian.Uint16(buf[:2])
 	portInt := int(port)
 	target := net.JoinHostPort(host, strconv.Itoa(portInt))
-	clientIP := clientIPOf(conn)
 
 	dctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -253,6 +260,24 @@ func clientIPOf(conn net.Conn) string {
 		return conn.RemoteAddr().String()
 	}
 	return host
+}
+
+// ipAllowed reports whether clientIP is contained in any of nets.
+// Empty clientIP or invalid IP is not allowed when nets is non-empty.
+func ipAllowed(clientIP string, nets []net.IPNet) bool {
+	if len(nets) == 0 {
+		return true
+	}
+	ip := net.ParseIP(clientIP)
+	if ip == nil {
+		return false
+	}
+	for i := range nets {
+		if nets[i].Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func relay(a, b net.Conn) {

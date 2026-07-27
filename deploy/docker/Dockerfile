@@ -9,10 +9,13 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/outline-gate ./cmd/outline-gate
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates nftables iproute2 wget
+# Soft-pin nftables major.minor to avoid silent breaking upgrades on rebuild.
+RUN apk add --no-cache ca-certificates nftables=~1.1 iproute2 wget
 COPY --from=build /out/outline-gate /usr/local/bin/outline-gate
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+# 1080 = SOCKS5, 8080 = health/UI. TRANSPROXY_LISTEN defaults to 127.0.0.1:12345
+# (loopback REDIRECT target) and must not be published outside the container.
 EXPOSE 1080 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/readyz || exit 1
