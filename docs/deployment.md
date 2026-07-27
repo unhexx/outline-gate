@@ -1,9 +1,11 @@
 # Deployment
 
+**Version:** [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md)
+
 ## Prerequisites
 
 - Docker Engine + Compose plugin
-- Outline access key (`ss://...`) from Outline Manager / provider
+- Outline access key (`ss://...` or `ssconf://...`) from Outline Manager / provider
 - For L3 gateway: ability to set default gateway on LAN clients; `NET_ADMIN` capability
 
 ## Secrets
@@ -14,13 +16,16 @@ echo -n 'ss://...' > deploy/compose/secrets/outline_key.txt
 chmod 600 deploy/compose/secrets/outline_key.txt
 ```
 
+Prefer `.env` (gitignored) or a host path via `OUTLINE_KEY_HOST_PATH`. Keys replaced in the Web UI go to `OUTLINE_KEY_PERSIST_FILE` (default `/config/outline_key.runtime.txt`) and take priority on next start.
+
 ## Profile A — host network (L3 gateway)
 
-Best when outline-gate runs on a always-on Linux box on the LAN.
+Best when outline-gate runs on an always-on Linux box on the LAN.
 
 ```bash
 cd deploy/compose
-GATEWAY_ENABLE=true docker compose -f docker-compose.host.yml up --build -d
+# .env: GATEWAY_ENABLE=true, OUTLINE_ACCESS_KEY=..., optionally UI_*
+docker compose -f docker-compose.host.yml up --build -d
 ```
 
 On clients:
@@ -31,8 +36,9 @@ On clients:
 Verify:
 
 ```bash
-curl --socks5 HOST_IP:1080 https://ifconfig.me
-curl http://HOST_IP:8080/readyz
+curl -s --socks5h HOST_IP:1080 https://ifconfig.me
+curl -s http://HOST_IP:8080/readyz
+# UI (if UI_ENABLE=true): http://HOST_IP:8080/ui/
 ```
 
 On stop, rules table `inet outline_gate` is removed. If the process crashes, re-run or:
@@ -56,10 +62,34 @@ Attach the service to `lan` with a static IP, set `GATEWAY_ENABLE=true`, point c
 
 ## Profile C — bridge SOCKS only
 
-Default `docker-compose.yml`: `GATEWAY_ENABLE=false`, publish `1080`/`8080`.  
+Default `docker-compose.yml`: `GATEWAY_ENABLE=false`, publish `1080` / health (`HOST_HEALTH_PORT` → container `8080`).  
 Apps configure SOCKS5 to `host:1080`. No default-gateway change required.
+
+```bash
+cd deploy/compose
+cp .env.example .env
+# OUTLINE_ACCESS_KEY, UI_ENABLE, UI_TOKEN, HOST_HEALTH_PORT=28080
+docker compose up --build -d
+curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
+curl -s http://127.0.0.1:28080/readyz
+```
+
+## Install from release tag
+
+```bash
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate && git checkout v0.1.0
+docker build -f deploy/docker/Dockerfile -t outline-gate:v0.1.0 .
+```
+
+Binary (no Docker):
+
+```text
+https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64
+```
 
 ## Firewall
 
 - Restrict `:1080` to LAN if exposed
-- Do not publish SOCKS to the public Internet without auth (v1 has no SOCKS auth)
+- Do not publish SOCKS to the public Internet without auth (v0.1.0 has no SOCKS auth)
+- Restrict health/UI port when `UI_ENABLE=true`; protect with strong `UI_TOKEN` (+ reverse-proxy TLS if exposed beyond LAN)

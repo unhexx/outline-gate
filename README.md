@@ -1,10 +1,15 @@
 # outline-gate
 
-[![CI](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml)
+[![CI](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver)](https://github.com/unhexx/outline-gate/releases/latest)
+[![GitHub release date](https://img.shields.io/github/release-date/unhexx/outline-gate)](https://github.com/unhexx/outline-gate/releases/latest)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/unhexx/outline-gate)](go.mod)
 [![Go Report Card](https://goreportcard.com/badge/github.com/unhexx/outline-gate)](https://goreportcard.com/report/github.com/unhexx/outline-gate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/unhexx/outline-gate)](go.mod)
-[![Release](https://img.shields.io/github/v/release/unhexx/outline-gate?include_prereleases&sort=semver)](https://github.com/unhexx/outline-gate/releases)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-informational)](#сборка-образа)
+[![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
+
+**Current release: [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64)
 
 Docker LAN-шлюз к [Outline](https://getoutline.org/) (Shadowsocks): **SOCKS5**, опциональный **L3 split-tunnel** и **Web UI**.
 
@@ -24,14 +29,15 @@ Docker LAN-шлюз к [Outline](https://getoutline.org/) (Shadowsocks): **SOCKS
 ## Оглавление
 
 1. [Быстрый старт](#быстрый-старт)
-2. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
-3. [Использование SOCKS5](#использование-socks5)
-4. [Использование L3 gateway](#использование-l3-gateway)
-5. [Web UI](#web-ui)
-6. [Переменные окружения](#основные-переменные)
-7. [Сборка образа](#сборка-образа)
-8. [Best practices](#best-practices)
-9. [Документация](#документация)
+2. [Релиз и установка](#релиз-и-установка)
+3. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
+4. [Использование SOCKS5](#использование-socks5)
+5. [Использование L3 gateway](#использование-l3-gateway)
+6. [Web UI](#web-ui)
+7. [Переменные окружения](#основные-переменные)
+8. [Сборка образа](#сборка-образа)
+9. [Best practices](#best-practices)
+10. [Документация](#документация)
 
 ---
 
@@ -62,6 +68,47 @@ L3-шлюз (host network, клиенты LAN → IP хоста как default G
 # в .env: GATEWAY_ENABLE=true
 docker compose -f docker-compose.host.yml up --build -d
 ```
+
+---
+
+## Релиз и установка
+
+| Канал | Ссылка |
+|-------|--------|
+| GitHub Releases | https://github.com/unhexx/outline-gate/releases |
+| Latest tag | [`v0.1.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.1.0`) |
+
+### Docker (рекомендуется)
+
+```bash
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
+git checkout v0.1.0
+cd deploy/compose
+cp .env.example .env
+# OUTLINE_ACCESS_KEY=...  UI_ENABLE=true  UI_TOKEN=...
+docker compose up --build -d
+```
+
+Образ с меткой релиза:
+
+```bash
+docker build -f deploy/docker/Dockerfile -t outline-gate:v0.1.0 .
+```
+
+### Бинарник Linux amd64
+
+```bash
+curl -fsSL -o outline-gate \
+  https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64
+chmod +x outline-gate
+export OUTLINE_ACCESS_KEY='ss://...'
+./outline-gate
+```
+
+Требуется Linux (для L3 — root/`NET_ADMIN` + `nft`). Для production предпочтителен Docker-образ.
 
 ---
 
@@ -503,20 +550,31 @@ docker run --rm -d --name outline-gate \
 
 | Документ | Содержание |
 |----------|------------|
-| **[docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md)** | Пошаговое развёртывание (RU) |
-| [docs/architecture.md](docs/architecture.md) | Архитектура |
+| **[docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md)** | Пошаговое развёртывание и эксплуатация (RU) |
+| [docs/architecture.md](docs/architecture.md) | Архитектура компонентов |
 | [docs/deployment.md](docs/deployment.md) | Профили сети A/B/C |
 | [docs/routing.md](docs/routing.md) | Режимы маршрутизации и bypass |
-| [docs/images/](docs/images/) | Схемы и иллюстрации для README |
+| [docs/images/](docs/images/) | Схемы и иллюстрации |
+| [CHANGELOG.md](CHANGELOG.md) | История релизов (Keep a Changelog) |
+| [Releases](https://github.com/unhexx/outline-gate/releases) | Бинарники и notes |
 
 ## Репозиторий
 
-- GitHub: https://github.com/unhexx/outline-gate
-- Origin: `git.aservice24.ru`
+| Remote | URL | Default for release |
+|--------|-----|---------------------|
+| GitHub | https://github.com/unhexx/outline-gate | `master`, tags `v*` |
+| aservice (origin) | https://git.aservice24.ru/scm/expert/outline-gate.git | `master`, tags `v*` |
 
 ```bash
+# GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
+git checkout v0.1.0
+
+# Internal
+git clone https://git.aservice24.ru/scm/expert/outline-gate.git
+cd outline-gate
+git checkout v0.1.0
 ```
 
 ## Безопасность
@@ -525,7 +583,8 @@ cd outline-gate
 - Не коммитьте `.env`, `*.runtime.txt` и реальные ключи
 - В логах ключ редактируется (`ss://***@host:port`)
 - API UI без токена → `401`
+- Ограничения v0.1.0: TCP-first (UDP L3 неполный), domain-bypass на L3 — best-effort
 
 ## License
 
-MIT
+[MIT](LICENSE)
