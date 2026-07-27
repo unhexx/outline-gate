@@ -4,7 +4,7 @@ package routing
 import (
 	"net"
 
-	"github.com/unhex/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/config"
 )
 
 // Path is the selected forwarding path for a destination.

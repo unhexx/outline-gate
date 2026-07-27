@@ -73,6 +73,8 @@ type Config struct {
 	// SOCKSAllowCIDRs limits SOCKS5 client source IPs. Empty means allow all
 	// (trusted LAN only — SOCKS has no authentication).
 	SOCKSAllowCIDRs []net.IPNet
+	// MetricsEnable exposes Prometheus text metrics at /metrics on HealthListen.
+	MetricsEnable bool
 }
 
 // Load reads configuration from the process environment.
@@ -181,6 +183,13 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	}
 	if v := strings.TrimSpace(getenv("OUTLINE_KEY_PERSIST_FILE")); v != "" {
 		cfg.AccessKeyPersistFile = v
+	}
+	if v := strings.TrimSpace(getenv("METRICS_ENABLE")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("METRICS_ENABLE: %w", err)
+		}
+		cfg.MetricsEnable = b
 	}
 
 	bypass, err := loadCIDRs(getenv, "BYPASS_CIDRS", "BYPASS_CIDRS_FILE")

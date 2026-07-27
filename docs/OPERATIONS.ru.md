@@ -1,6 +1,6 @@
 # outline-gate — пошаговая инструкция по развёртыванию и эксплуатации
 
-**Релиз:** [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
+**Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
 
 | | |
 |--|--|
@@ -42,19 +42,19 @@
 # GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.2.0
+git checkout v0.4.0
 
 # или aservice
 git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
-git checkout v0.2.0
+git checkout v0.4.0
 ```
 
 Бинарник Linux amd64 (без Docker):
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.2.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
 chmod +x outline-gate
 ```
 
@@ -153,7 +153,7 @@ docker run --rm -d --name outline-gate \
   -e LOG_LEVEL=info \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
-  outline-gate:v0.2.0
+  outline-gate:v0.4.0
 ```
 
 Доп. параметры — любыми `-e ИМЯ=значение` (см. таблицу).
@@ -251,6 +251,7 @@ sudo nft delete table inet outline_gate   # если осталась
 | `SOCKS_LISTEN` | нет | `0.0.0.0:1080` | SOCKS5 |
 | `SOCKS_ALLOW_CIDRS` | нет | (пусто = все) | Allowlist source IP клиентов SOCKS (CSV) |
 | `SOCKS_ALLOW_CIDRS_FILE` | нет | — | Файл CIDR source allowlist (по строке) |
+| `METRICS_ENABLE` | нет | `false` | Prometheus text metrics на `/metrics` |
 | `HEALTH_LISTEN` | нет | `0.0.0.0:8080` | Health HTTP |
 | `TRANSPROXY_LISTEN` | нет | `127.0.0.1:12345` | REDIRECT target |
 | `LOG_LEVEL` | нет | `info` | debug/info/warn/error |

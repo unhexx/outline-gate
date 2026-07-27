@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unhex/outline-gate/internal/bypass"
-	"github.com/unhex/outline-gate/internal/config"
-	"github.com/unhex/outline-gate/internal/connlog"
+	"github.com/unhexx/outline-gate/internal/bypass"
+	"github.com/unhexx/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/connlog"
 )
 
 type fakeOutline struct {
@@ -189,6 +189,26 @@ func TestConnectionsAPIAndSSE(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status: %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestVersionEndpointPublic(t *testing.T) {
+	mux := http.NewServeMux()
+	srv := &Server{
+		Version: "v0.4.0",
+		Token:   "secret",
+	}
+	srv.Mount(mux)
+
+	// no auth required
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("version: %d %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), `"version":"v0.4.0"`) {
+		t.Fatalf("body: %s", rr.Body.String())
 	}
 }
 

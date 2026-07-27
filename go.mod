@@ -1,4 +1,4 @@
-module github.com/unhex/outline-gate
+module github.com/unhexx/outline-gate
 
 go 1.26.5
 

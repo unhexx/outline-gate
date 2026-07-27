@@ -22,7 +22,11 @@ type Via string
 const (
 	ViaTunnel Via = "tunnel"
 	ViaDirect Via = "direct"
+	ViaDrop   Via = "drop"
 )
+
+// DefaultTTL is how long events stay in the ring when capacity is not full.
+const DefaultTTL = time.Hour
 
 // Event is a single connection attempt recorded for the UI.
 type Event struct {
@@ -41,21 +45,31 @@ type Event struct {
 }
 
 // Store is a fixed-capacity ring buffer with non-blocking fan-out to subscribers.
+// Events older than TTL are pruned on write/read (in addition to capacity).
 type Store struct {
 	mu   sync.RWMutex
 	cap  int
+	ttl  time.Duration
 	buf  []Event
 	seq  uint64
 	subs map[chan Event]struct{}
 }
 
-// New creates a Store with the given capacity (minimum 1; default 500 if <= 0).
+// New creates a Store with the given capacity (minimum 1; default 500 if <= 0)
+// and DefaultTTL (1h).
 func New(capacity int) *Store {
+	return NewWithTTL(capacity, DefaultTTL)
+}
+
+// NewWithTTL creates a Store with capacity and event TTL.
+// ttl <= 0 disables time-based pruning (capacity-only ring).
+func NewWithTTL(capacity int, ttl time.Duration) *Store {
 	if capacity <= 0 {
 		capacity = 500
 	}
 	return &Store{
 		cap:  capacity,
+		ttl:  ttl,
 		buf:  make([]Event, 0, capacity),
 		subs: make(map[chan Event]struct{}),
 	}
@@ -74,8 +88,9 @@ func (s *Store) Len() int {
 	if s == nil {
 		return 0
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneLocked(time.Now())
 	return len(s.buf)
 }
 
@@ -91,6 +106,7 @@ func (s *Store) Record(e Event) Event {
 	if e.Time.IsZero() {
 		e.Time = time.Now().UTC()
 	}
+	s.pruneLocked(e.Time)
 	if len(s.buf) < s.cap {
 		s.buf = append(s.buf, e)
 	} else {
@@ -115,14 +131,37 @@ func (s *Store) Record(e Event) Event {
 	return e
 }
 
+// pruneLocked drops events older than TTL. Caller must hold s.mu.
+func (s *Store) pruneLocked(now time.Time) {
+	if s.ttl <= 0 || len(s.buf) == 0 {
+		return
+	}
+	cutoff := now.Add(-s.ttl)
+	// find first event still within TTL (buf is chronological)
+	i := 0
+	for i < len(s.buf) && s.buf[i].Time.Before(cutoff) {
+		i++
+	}
+	if i == 0 {
+		return
+	}
+	if i >= len(s.buf) {
+		s.buf = s.buf[:0]
+		return
+	}
+	copy(s.buf[0:], s.buf[i:])
+	s.buf = s.buf[:len(s.buf)-i]
+}
+
 // Snapshot returns up to limit most recent events in chronological order
 // (oldest → newest). limit <= 0 means all stored events.
 func (s *Store) Snapshot(limit int) []Event {
 	if s == nil {
 		return nil
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneLocked(time.Now())
 	n := len(s.buf)
 	if n == 0 {
 		return nil
@@ -141,8 +180,9 @@ func (s *Store) Stats(since time.Time) (total, vpn, direct, ok, fail int) {
 	if s == nil {
 		return
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pruneLocked(time.Now())
 	for i := range s.buf {
 		e := &s.buf[i]
 		if !since.IsZero() && e.Time.Before(since) {
@@ -151,6 +191,8 @@ func (s *Store) Stats(since time.Time) (total, vpn, direct, ok, fail int) {
 		total++
 		if e.Via == ViaDirect {
 			direct++
+		} else if e.Via == ViaDrop {
+			// count as neither vpn nor direct for UI totals; still in total
 		} else {
 			vpn++
 		}
@@ -196,7 +238,9 @@ func (s *Store) FromFields(proto, clientIP, target, host string, port int, via, 
 		p = Proto(proto)
 	}
 	v := Via(strings.ToLower(via))
-	if v != ViaTunnel && v != ViaDirect {
+	switch v {
+	case ViaTunnel, ViaDirect, ViaDrop:
+	default:
 		v = ViaTunnel
 	}
 	return s.Record(Event{
