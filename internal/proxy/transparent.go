@@ -13,13 +13,31 @@ import (
 	"unsafe"
 )
 
+// Path values returned by PathDecider (match routing.Path semantics).
+const (
+	PathDirect = "direct"
+	PathTunnel = "tunnel"
+	PathDrop   = "drop"
+)
+
+// PathDecider chooses tunnel vs direct vs drop for an L3 destination IP.
+type PathDecider interface {
+	// DecidePath returns via ("tunnel"|"direct"|"drop") and optional rule label.
+	DecidePath(dst net.IP) (via string, rule string)
+}
+
 // Transparent is a TCP proxy for connections redirected via iptables/nft REDIRECT.
-// It recovers the original destination with SO_ORIGINAL_DST and dials through Outline.
+// It recovers the original destination with SO_ORIGINAL_DST and dials through
+// Outline (tunnel) or a direct dialer based on PathDecider.
 type Transparent struct {
 	ListenAddr string
-	Dialer     Dialer
+	// Dialer is used for tunnelled connections (Outline).
+	Dialer Dialer
+	// DirectDialer is used for PathDirect; defaults to net.Dialer.
+	DirectDialer Dialer
+	// Decider selects tunnel/direct/drop. If nil, all traffic uses Dialer (tunnel).
+	Decider PathDecider
 	// ConnLog optionally records each connection for the live UI log.
-	// L3 bypass (nft) never reaches this proxy, so events are always via tunnel.
 	ConnLog ConnRecorder
 	Logger  *slog.Logger
 	Timeout time.Duration
@@ -93,22 +111,50 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 		port = p
 	}
 
-	dctx, cancel := context.WithTimeout(ctx, t.Timeout)
-	defer cancel()
-	start := time.Now()
-	remote, err := t.Dialer.DialContext(dctx, "tcp", orig)
-	dur := time.Since(start).Milliseconds()
-	if err != nil {
-		t.Logger.Debug("transparent dial failed", "target", orig, "err", err)
+	via := PathTunnel
+	rule := ""
+	if t.Decider != nil {
+		ip := net.ParseIP(host)
+		via, rule = t.Decider.DecidePath(ip)
+		if via == "" {
+			via = PathTunnel
+		}
+	}
+
+	if via == PathDrop {
 		t.record(ConnEvent{
 			Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
-			Via: "tunnel", OK: false, Error: err.Error(), DurationMs: dur,
+			Via: PathDrop, Rule: rule, OK: false, Error: "dropped by routing policy",
 		})
 		return
 	}
+
+	dialer := t.Dialer
+	if via == PathDirect {
+		if t.DirectDialer != nil {
+			dialer = t.DirectDialer
+		} else {
+			dialer = &net.Dialer{}
+		}
+	}
+
+	dctx, cancel := context.WithTimeout(ctx, t.Timeout)
+	defer cancel()
+	start := time.Now()
+	remote, err := dialer.DialContext(dctx, "tcp", orig)
+	dur := time.Since(start).Milliseconds()
+	if err != nil {
+		t.Logger.Debug("transparent dial failed", "target", orig, "via", via, "err", err)
+		t.record(ConnEvent{
+			Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
+			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,
+		})
+		return
+	}
+	t.Logger.Debug("transparent connect ok", "target", orig, "via", via)
 	t.record(ConnEvent{
 		Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
-		Via: "tunnel", OK: true, DurationMs: dur,
+		Via: via, Rule: rule, OK: true, DurationMs: dur,
 	})
 	defer remote.Close()
 	relay(conn, remote)

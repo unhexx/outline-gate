@@ -1,6 +1,6 @@
 # Architecture
 
-**Version:** [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) · diagrams: [docs/images/](images/)
+**Version:** [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) · diagrams: [docs/images/](images/)
 
 ```
 LAN clients ──► outline-gate ──ss:// / ssconf://──► Outline Server
@@ -33,11 +33,15 @@ See also: [architecture-overview.svg](images/architecture-overview.svg).
 ## Data path (L3)
 
 1. Client routes packet via gate IP (`ip_forward=1`).
-2. nftables `prerouting` REDIRECTs matching TCP to local transparent port.
-3. Transparent proxy reads original destination and dials via Outline.
-4. `postrouting` MASQUERADE rewrites source for return path.
+2. nftables `prerouting`: destinations in `@private` (RFC1918 / reserved) stay on the **kernel** path; all other TCP is **REDIRECT**ed to the transparent proxy.
+3. Transparent proxy reads `SO_ORIGINAL_DST` and uses `routing.Engine`:
+   - **tunnel** → Outline dialer  
+   - **direct** → local `net.Dialer` (user bypass, Outline server IP, include residual)  
+   - **drop** → close (include + `DIRECT_POLICY=drop`)
+4. Each attempt is recorded in `connlog` (`via=tunnel|direct|drop`).
+5. `postrouting` MASQUERADE rewrites source for return path.
 
-UDP is not fully handled in v0.1.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
+UDP is not fully handled in v0.2.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
 
 ## Data path (SOCKS5)
 
@@ -50,9 +54,10 @@ UDP is not fully handled in v0.1.0 (TCP-first). Use SOCKS5 for apps that need fu
 ## Connection log (Web UI)
 
 - Ring buffer (~500 events) in process memory; no disk persistence.
-- Sources: **SOCKS5** (tunnel + direct) and **L3 transparent** (always tunnel — nft bypass never reaches the proxy).
+- Sources: **SOCKS5** (tunnel + direct) and **L3 transparent** (tunnel + direct + drop for non-private TCP).
+- Private/RFC1918 L3 flows stay in kernel and are not logged.
 - API: `GET /api/v1/connections`, `GET /api/v1/connections/stream` (SSE; `?token=` for EventSource).
-- UI tab **Лог** shows path chains: `client → SOCKS|L3 → VPN|Direct → host`.
+- UI tab **Лог** shows path chains: `client → SOCKS|L3 → VPN|Direct|Drop → host`.
 
 ## Config reload
 

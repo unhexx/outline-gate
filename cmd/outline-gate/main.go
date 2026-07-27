@@ -68,9 +68,10 @@ func run() error {
 	}
 
 	var (
-		mu         sync.Mutex
-		gw         *gateway.Gateway
-		bypassMgr  *bypass.Manager
+		mu          sync.Mutex
+		gw          *gateway.Gateway
+		engine      *routing.Engine
+		bypassMgr   *bypass.Manager
 		rebuildPush func()
 	)
 
@@ -80,9 +81,9 @@ func run() error {
 		if bypassMgr == nil {
 			return
 		}
-		eng := routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+		engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
 		if gw != nil {
-			if err := gw.UpdateEngine(eng); err != nil {
+			if err := gw.UpdateEngine(engine); err != nil {
 				log.Error("gateway update after bypass change", "err", err)
 			}
 		}
@@ -101,7 +102,7 @@ func run() error {
 	}
 
 	mu.Lock()
-	engine := routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+	engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
 	if cfg.GatewayEnable {
 		gw = gateway.New(cfg, engine, log)
 	}
@@ -211,10 +212,16 @@ func run() error {
 
 	if cfg.GatewayEnable {
 		tp := &proxy.Transparent{
-			ListenAddr: cfg.TransproxyListen,
-			Dialer:     client,
-			ConnLog:    connHook,
-			Logger:     log,
+			ListenAddr:   cfg.TransproxyListen,
+			Dialer:       client,
+			DirectDialer: &net.Dialer{},
+			Decider: &l3PathDecider{
+				mu:     &mu,
+				engine: func() *routing.Engine { return engine },
+				bypass: bypassMgr,
+			},
+			ConnLog: connHook,
+			Logger:  log,
 		}
 		wg.Add(1)
 		go func() {
@@ -275,14 +282,15 @@ func run() error {
 				mu.Lock()
 				cfg = newCfg
 				if gw != nil {
-					eng := routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+					engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
 					wasActive := gw.Active()
-					gw = gateway.New(cfg, eng, log)
+					gw = gateway.New(cfg, engine, log)
 					mu.Unlock()
 					bypassMgr.SetStatic(cfg.BypassCIDRs)
 					if err := bypassMgr.Load(ctx); err != nil {
 						log.Error("bypass reload", "err", err)
 					}
+					// Load triggers OnChange → rebuildPush, which refreshes engine + gateway
 					if wasActive {
 						if err := gw.Apply(); err != nil {
 							log.Error("gateway reload", "err", err)
@@ -331,4 +339,40 @@ func serverIPsFrom(client *outline.Client) []net.IP {
 		return []net.IP{ip}
 	}
 	return nil
+}
+
+// l3PathDecider implements proxy.PathDecider using the live routing engine.
+type l3PathDecider struct {
+	mu     *sync.Mutex
+	engine func() *routing.Engine
+	bypass *bypass.Manager
+}
+
+func (d *l3PathDecider) DecidePath(dst net.IP) (via string, rule string) {
+	if d == nil || dst == nil {
+		return proxy.PathTunnel, ""
+	}
+	d.mu.Lock()
+	eng := d.engine()
+	d.mu.Unlock()
+	if eng == nil {
+		return proxy.PathTunnel, ""
+	}
+	switch eng.Decide(dst) {
+	case routing.PathDrop:
+		return proxy.PathDrop, "policy:drop"
+	case routing.PathDirect:
+		if eng.IsServerIP(dst) {
+			return proxy.PathDirect, "outline-server"
+		}
+		if d.bypass != nil {
+			if ok, r := d.bypass.MatchBypass(dst.String()); ok {
+				return proxy.PathDirect, r
+			}
+		}
+		// include-mode residual Direct, or static bypass nets not in user store
+		return proxy.PathDirect, "policy:direct"
+	default:
+		return proxy.PathTunnel, ""
+	}
 }
