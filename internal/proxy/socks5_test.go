@@ -110,6 +110,72 @@ func TestSOCKS5Connect(t *testing.T) {
 	_ = portStr
 }
 
+func TestIPAllowed(t *testing.T) {
+	nets := []net.IPNet{
+		{IP: net.ParseIP("127.0.0.0").To4(), Mask: net.CIDRMask(8, 32)},
+		{IP: net.ParseIP("10.0.0.0").To4(), Mask: net.CIDRMask(8, 32)},
+	}
+	if !ipAllowed("127.0.0.1", nets) {
+		t.Fatal("loopback should be allowed")
+	}
+	if !ipAllowed("10.1.2.3", nets) {
+		t.Fatal("10/8 should be allowed")
+	}
+	if ipAllowed("192.168.1.1", nets) {
+		t.Fatal("192.168 should be denied")
+	}
+	if ipAllowed("not-an-ip", nets) {
+		t.Fatal("invalid IP should be denied")
+	}
+	if !ipAllowed("8.8.8.8", nil) {
+		t.Fatal("empty allowlist means allow all")
+	}
+}
+
+func TestSOCKS5RejectAllowlist(t *testing.T) {
+	// Only 10.0.0.0/8; client from 127.0.0.1 must be dropped before greeting reply.
+	s := &SOCKS5{
+		ListenAddr: "127.0.0.1:0",
+		Dialer:     echoDialer{},
+		Timeout:    2 * time.Second,
+		AllowCIDRs: []net.IPNet{
+			{IP: net.ParseIP("10.0.0.0").To4(), Mask: net.CIDRMask(8, 32)},
+		},
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	s.ln = ln
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go s.handle(ctx, conn)
+		}
+	}()
+
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	_ = c.SetDeadline(time.Now().Add(2 * time.Second))
+	if _, err := c.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	resp := make([]byte, 2)
+	_, err = io.ReadFull(c, resp)
+	if err == nil {
+		t.Fatalf("expected connection close without SOCKS reply, got %v", resp)
+	}
+}
+
 func TestSOCKS5RejectIPv6(t *testing.T) {
 	s := &SOCKS5{
 		ListenAddr: "127.0.0.1:0",

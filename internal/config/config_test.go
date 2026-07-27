@@ -115,6 +115,32 @@ func TestLoadFromEnv_InvalidMode(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnv_InvalidDirectPolicy(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"ROUTING_MODE":       "exclude",
+		"DIRECT_POLICY":      "typo",
+	}
+	_, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err == nil {
+		t.Fatal("expected error for invalid DIRECT_POLICY")
+	}
+}
+
+func TestLoadFromEnv_SOCKSAllowCIDRs(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"SOCKS_ALLOW_CIDRS":  "127.0.0.0/8,10.0.0.0/8",
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.SOCKSAllowCIDRs) != 2 {
+		t.Fatalf("SOCKSAllowCIDRs: %d", len(cfg.SOCKSAllowCIDRs))
+	}
+}
+
 func TestLoadFromEnv_UIRequiresToken(t *testing.T) {
 	env := map[string]string{
 		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",

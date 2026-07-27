@@ -249,6 +249,8 @@ sudo nft delete table inet outline_gate   # если осталась
 | `GATEWAY_ENABLE` | нет | `false` / host:`true` | L3 nftables |
 | `LAN_INTERFACE` | нет | — | oif для MASQUERADE |
 | `SOCKS_LISTEN` | нет | `0.0.0.0:1080` | SOCKS5 |
+| `SOCKS_ALLOW_CIDRS` | нет | (пусто = все) | Allowlist source IP клиентов SOCKS (CSV) |
+| `SOCKS_ALLOW_CIDRS_FILE` | нет | — | Файл CIDR source allowlist (по строке) |
 | `HEALTH_LISTEN` | нет | `0.0.0.0:8080` | Health HTTP |
 | `TRANSPROXY_LISTEN` | нет | `127.0.0.1:12345` | REDIRECT target |
 | `LOG_LEVEL` | нет | `info` | debug/info/warn/error |

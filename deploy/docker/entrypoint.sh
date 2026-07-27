@@ -27,4 +27,12 @@ if [ -z "${OUTLINE_ACCESS_KEY:-}" ]; then
   exit 1
 fi
 
+case "$OUTLINE_ACCESS_KEY" in
+  ss://*|ssconf://*) ;;
+  *)
+    echo "outline-gate: key must start with ss:// or ssconf://" >&2
+    exit 1
+    ;;
+esac
+
 exec "$@"
