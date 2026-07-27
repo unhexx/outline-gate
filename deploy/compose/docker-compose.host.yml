@@ -44,6 +44,8 @@ services:
       BYPASS_RULES_FILE: ${BYPASS_RULES_FILE:-/config/bypass.rules.txt}
       BYPASS_DNS_REFRESH: ${BYPASS_DNS_REFRESH:-60s}
       OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
+      # Prometheus text exposition on HEALTH_LISTEN (/metrics). Off by default.
+      METRICS_ENABLE: ${METRICS_ENABLE:-false}
     volumes:
       - ./config:/config
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro

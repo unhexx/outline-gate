@@ -12,7 +12,7 @@
 [![L3](https://img.shields.io/badge/L3-userspace_routing-3dd68c)](docs/routing.md)
 [![Version](https://img.shields.io/badge/version-v0.4.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)
 [![Module](https://img.shields.io/badge/module-unhexx%2Foutline--gate-informational)](go.mod)
-[![Metrics](https://img.shields.io/badge/metrics-/metrics-orange)](#основные-переменные)
+[![Metrics](https://img.shields.io/badge/metrics-/metrics-orange)](#prometheus-metrics)
 
 **Current release: [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64)
 
@@ -564,6 +564,23 @@ docker compose up -d --force-recreate
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 
 Полный список: [`deploy/compose/.env.example`](deploy/compose/.env.example).
+
+### Prometheus metrics
+
+Опциональный endpoint **без auth** на том же порту, что health/UI (`HEALTH_LISTEN` / `HOST_HEALTH_PORT`).
+
+```bash
+# deploy/compose/.env
+METRICS_ENABLE=true
+
+cd deploy/compose && docker compose up -d --force-recreate
+
+curl -s http://127.0.0.1:${HOST_HEALTH_PORT:-8080}/metrics
+# outline_gate_up 1
+# outline_gate_connections_total{via="tunnel",result="ok"} …
+```
+
+Переменная пробрасывается в compose (`METRICS_ENABLE`). Не публикуйте health-порт в интернет без firewall — `/metrics` открыт как `/healthz`.
 
 ---
 
