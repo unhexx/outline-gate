@@ -26,11 +26,21 @@ func TestDryRunExclude(t *testing.T) {
 	if !strings.Contains(script, "add table inet outline_gate") {
 		t.Fatal("missing table")
 	}
-	if !strings.Contains(script, "ip daddr != @bypass") || !strings.Contains(script, "redirect to :12345") {
-		t.Fatal("exclude rule missing")
+	if !strings.Contains(script, "add set inet outline_gate private") {
+		t.Fatal("missing private set")
 	}
-	if !strings.Contains(script, "203.0.113.1") {
-		t.Fatal("server IP should be in bypass elements")
+	if !strings.Contains(script, "ip daddr @private return") {
+		t.Fatal("private skip rule missing")
+	}
+	if !strings.Contains(script, "meta l4proto tcp redirect to :12345") {
+		t.Fatal("blanket TCP redirect missing")
+	}
+	// userspace decides Direct; must not skip user/server via nft bypass set
+	if strings.Contains(script, "ip daddr != @bypass") {
+		t.Fatal("legacy exclude bypass skip should be gone")
+	}
+	if !strings.Contains(script, "10.0.0.0/8") {
+		t.Fatal("default private CIDR should be in private set")
 	}
 	if !strings.Contains(script, `oifname "eth0"`) {
 		t.Fatal("masquerade iface")
@@ -51,10 +61,15 @@ func TestDryRunInclude(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(script, "ip daddr @tunnel") {
-		t.Fatal("include rule missing")
+	// include mode also uses userspace path decision + blanket redirect
+	if !strings.Contains(script, "meta l4proto tcp redirect to :12345") {
+		t.Fatal("TCP redirect missing")
 	}
-	if !strings.Contains(script, "drop") {
-		t.Fatal("drop policy missing")
+	if !strings.Contains(script, "ip daddr @private return") {
+		t.Fatal("private skip missing")
+	}
+	// drop is handled in transparent userspace, not nft forward
+	if strings.Contains(script, " type filter hook forward") {
+		t.Fatal("legacy nft forward drop should be gone")
 	}
 }

@@ -214,11 +214,23 @@
   }
 
   function viaLabel(via) {
-    return via === "direct" ? "Direct" : "VPN";
+    if (via === "direct") return "Direct";
+    if (via === "drop") return "Drop";
+    return "VPN";
+  }
+
+  function viaIcon(via) {
+    if (via === "direct") return "icons/direct.svg";
+    if (via === "drop") return "icons/drop.svg";
+    return "icons/vpn.svg";
   }
 
   function protoLabel(p) {
     return p === "l3" ? "L3" : "SOCKS";
+  }
+
+  function protoIcon(p) {
+    return p === "l3" ? "icons/l3.svg" : "icons/socks.svg";
   }
 
   function formatTime(iso) {
@@ -244,7 +256,9 @@
   }
 
   function chainHTML(e) {
-    const via = e.via === "direct" ? "direct" : "tunnel";
+    let via = "tunnel";
+    if (e.via === "direct") via = "direct";
+    else if (e.via === "drop") via = "drop";
     const cls = ["chain", "via-" + via];
     if (!e.ok) cls.push("fail");
     const dest = escapeHtml(e.target || e.host || "—");
@@ -255,13 +269,16 @@
       ? `<span class="chain-ok" title="ok">✓</span>`
       : `<span class="chain-fail" title="${escapeAttr(e.error || "fail")}">✗</span>`;
     const err = !e.ok && e.error ? `<span class="chain-meta">${escapeHtml(e.error)}</span>` : "";
+    let badgeClass = "vpn";
+    if (via === "direct") badgeClass = "direct";
+    else if (via === "drop") badgeClass = "drop";
     return `<div class="${cls.join(" ")}" data-id="${e.id}">
       <span class="chain-time">${formatTime(e.time)}</span>
       <span class="chain-node" title="клиент">${client}</span>
       <span class="chain-arrow">→</span>
-      <span class="chain-node">${protoLabel(e.proto)}</span>
+      <span class="chain-node" title="${protoLabel(e.proto)}"><img class="ico" src="${protoIcon(e.proto)}" width="11" height="11" alt="" /> ${protoLabel(e.proto)}</span>
       <span class="chain-arrow">→</span>
-      <span class="badge-via ${via === "direct" ? "direct" : "vpn"}">${viaLabel(via)}</span>
+      <span class="badge-via ${badgeClass}"><img class="ico" src="${viaIcon(via)}" width="11" height="11" alt="" /> ${viaLabel(via)}</span>
       <span class="chain-arrow">→</span>
       <span class="chain-dest">${dest}</span>
       ${ok}

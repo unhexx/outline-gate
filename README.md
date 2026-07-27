@@ -8,8 +8,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-informational)](#сборка-образа)
 [![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
+[![Web UI](https://img.shields.io/badge/Web_UI-live_log-3d8bfd)](#web-ui)
+[![L3](https://img.shields.io/badge/L3-userspace_routing-3dd68c)](docs/routing.md)
+[![Version](https://img.shields.io/badge/version-v0.2.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0)
 
-**Current release: [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64)
+**Current release: [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.2.0/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -46,7 +49,7 @@
 ### Чем не является
 
 - Не **Outline Server / Manager** — только **клиент** к уже выданному ключу.
-- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.1.0 — TCP-first).
+- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.2.0 — TCP-first).
 - Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (только доверенная сеть).
 
 <p align="center">
@@ -58,7 +61,7 @@
 - Клиент Outline через **outline-sdk** (`ss://`, `ssconf://`)
 - **SOCKS5** (`:1080`) — explicit proxy; bypass → direct dial
 - **L3 gateway** (nftables): `exclude` / `include`, REDIRECT + MASQUERADE
-- **Web UI** (`/ui/`): статус, live-лог маршрутизации (VPN/Direct), bypass, замена ключа; API с `UI_TOKEN`
+- **Web UI** (`/ui/`): компактный UI, live-лог маршрутизации (VPN/Direct), bypass, замена ключа; API с `UI_TOKEN`
 - Конфиг: `.env`, volume-файлы, Docker secrets, SIGHUP-reload
 - Health: `/healthz`, `/readyz`
 
@@ -113,16 +116,16 @@ docker compose -f docker-compose.host.yml up --build -d
 | Канал | Ссылка |
 |-------|--------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
-| Latest tag | [`v0.1.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0) |
+| Latest tag | [`v0.2.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
-| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.1.0`) |
+| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.2.0`) |
 
 ### Docker (рекомендуется)
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.1.0
+git checkout v0.2.0
 cd deploy/compose
 cp .env.example .env
 # OUTLINE_ACCESS_KEY=...  UI_ENABLE=true  UI_TOKEN=...
@@ -132,14 +135,14 @@ docker compose up --build -d
 Образ с меткой релиза:
 
 ```bash
-docker build -f deploy/docker/Dockerfile -t outline-gate:v0.1.0 .
+docker build -f deploy/docker/Dockerfile -t outline-gate:v0.2.0 .
 ```
 
 ### Бинарник Linux amd64
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.2.0/outline-gate_linux_amd64
 chmod +x outline-gate
 export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate
@@ -526,7 +529,7 @@ docker compose up -d --force-recreate
 | `GET/POST/DELETE /api/v1/bypass` | Bearer / Basic | правила исключений |
 | `/healthz`, `/readyz` | нет | healthcheck |
 
-**Лог подключений:** для SOCKS видно цепочку `клиент → SOCKS → VPN|Direct → host` (и сработавшее правило bypass). Для L3 — только трафик, попавший в transparent proxy (почти всегда **VPN**); nft Direct bypass в приложение не приходит.
+**Лог подключений:** SOCKS и L3 показывают цепочку `клиент → SOCKS|L3 → VPN|Direct → host` (и правило bypass, если известно). На L3 private/RFC1918 остаётся kernel-path без записи в лог; остальной Internet TCP (включая user Direct) идёт через transparent proxy.
 
 Ключ, заменённый в UI → `OUTLINE_KEY_PERSIST_FILE` (по умолчанию `/config/outline_key.runtime.txt`), при старте **приоритетнее** `OUTLINE_ACCESS_KEY`.
 
@@ -611,12 +614,12 @@ docker run --rm -d --name outline-gate \
 # GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.1.0
+git checkout v0.2.0
 
 # Internal
 git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
-git checkout v0.1.0
+git checkout v0.2.0
 ```
 
 ## Безопасность
@@ -625,7 +628,7 @@ git checkout v0.1.0
 - Не коммитьте `.env`, `*.runtime.txt` и реальные ключи
 - В логах ключ редактируется (`ss://***@host:port`)
 - API UI без токена → `401`
-- Ограничения v0.1.0: TCP-first (UDP L3 неполный), domain-bypass на L3 — best-effort
+- Ограничения v0.2.0: TCP-first (UDP L3 неполный), domain-bypass на L3 — best-effort
 
 ## License
 

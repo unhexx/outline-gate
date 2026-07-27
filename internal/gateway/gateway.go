@@ -109,43 +109,27 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "add table inet %s\n", tableName)
 
-	// sets
-	fmt.Fprintf(&b, "add set inet %s bypass { type ipv4_addr; flags interval; }\n", tableName)
-	fmt.Fprintf(&b, "add set inet %s tunnel { type ipv4_addr; flags interval; }\n", tableName)
-
-	for _, n := range g.engine.BypassNets() {
+	// @private: RFC1918/reserved — kernel path only (no log flood).
+	// All other TCP is REDIRECTed to transparent proxy; tunnel vs Direct
+	// is decided in userspace so both appear in the connection log.
+	fmt.Fprintf(&b, "add set inet %s private { type ipv4_addr; flags interval; }\n", tableName)
+	for _, n := range config.DefaultBypassCIDRs() {
 		if n.IP.To4() == nil {
 			continue
 		}
-		fmt.Fprintf(&b, "add element inet %s bypass { %s }\n", tableName, n.String())
-	}
-	for _, n := range g.engine.TunnelNets() {
-		if n.IP.To4() == nil {
-			continue
-		}
-		fmt.Fprintf(&b, "add element inet %s tunnel { %s }\n", tableName, n.String())
+		fmt.Fprintf(&b, "add element inet %s private { %s }\n", tableName, n.String())
 	}
 
-	// prerouting: redirect matching TCP to local transparent proxy
+	// prerouting: redirect non-private TCP to local transparent proxy
 	fmt.Fprintf(&b, "add chain inet %s prerouting { type nat hook prerouting priority dstnat; policy accept; }\n", tableName)
-	// also handle locally generated traffic if needed — for LAN clients PREROUTING is enough
 	fmt.Fprintf(&b, "add chain inet %s output { type nat hook output priority dstnat; policy accept; }\n", tableName)
 
 	// Skip redirect of traffic already aimed at the local transparent port.
 	fmt.Fprintf(&b, "add rule inet %s prerouting tcp dport %d return\n", tableName, port)
-
-	switch g.cfg.RoutingMode {
-	case config.ModeExclude:
-		// redirect TCP if NOT in bypass
-		fmt.Fprintf(&b, "add rule inet %s prerouting ip daddr != @bypass meta l4proto tcp redirect to :%d\n", tableName, port)
-	case config.ModeInclude:
-		fmt.Fprintf(&b, "add rule inet %s prerouting ip daddr @tunnel meta l4proto tcp redirect to :%d\n", tableName, port)
-		if g.cfg.DirectPolicy == config.DirectDrop {
-			fmt.Fprintf(&b, "add chain inet %s forward { type filter hook forward priority filter; policy accept; }\n", tableName)
-			// drop forwarded traffic that is neither bypass nor tunnel (best-effort)
-			fmt.Fprintf(&b, "add rule inet %s forward ip daddr != @bypass ip daddr != @tunnel drop\n", tableName)
-		}
-	}
+	// Private/reserved destinations stay on the kernel forward path.
+	fmt.Fprintf(&b, "add rule inet %s prerouting ip daddr @private return\n", tableName)
+	// Everything else (tunnel + user Direct + include residual) → userspace.
+	fmt.Fprintf(&b, "add rule inet %s prerouting meta l4proto tcp redirect to :%d\n", tableName, port)
 
 	// masquerade for forwarded traffic leaving LAN interface (or any)
 	fmt.Fprintf(&b, "add chain inet %s postrouting { type nat hook postrouting priority srcnat; policy accept; }\n", tableName)

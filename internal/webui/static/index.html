@@ -4,150 +4,132 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>outline-gate</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
     <header class="top">
       <div class="brand">
-        <h1>outline-gate</h1>
-        <p class="muted">VPN-шлюз · split-tunnel · live-маршрутизация</p>
+        <img class="brand-logo" src="icons/logo.svg" width="28" height="28" alt="" />
+        <div>
+          <h1>outline-gate <span class="ver">v0.2.0</span></h1>
+          <p class="muted">split-tunnel · live log · SOCKS + L3</p>
+        </div>
       </div>
       <div class="top-status" id="top-status" aria-live="polite">
-        <span class="pill pill-muted" id="ready-pill">VPN —</span>
+        <span class="pill pill-muted" id="ready-pill">
+          <img class="ico" src="icons/vpn.svg" alt="" width="12" height="12" /> VPN —
+        </span>
         <span class="pill pill-ghost" id="auth-pill">токен</span>
       </div>
     </header>
 
-    <section class="card auth" id="auth-panel">
-      <label for="token">Токен доступа (UI_TOKEN)</label>
-      <div class="row">
-        <input id="token" type="password" autocomplete="current-password" placeholder="токен" />
-        <button type="button" id="btn-save-token">Сохранить</button>
-        <button type="button" id="btn-clear-token" class="ghost">Сбросить</button>
+    <section class="card auth compact" id="auth-panel">
+      <div class="row auth-row">
+        <label for="token" class="inline-label">UI_TOKEN</label>
+        <input id="token" type="password" autocomplete="current-password" placeholder="Bearer token" />
+        <button type="button" id="btn-save-token">OK</button>
+        <button type="button" id="btn-clear-token" class="ghost">×</button>
       </div>
-      <p class="hint">Токен хранится только в sessionStorage браузера. Нужен для API и live-лога.</p>
+      <p class="hint">Токен только в sessionStorage · нужен для API и SSE-лога</p>
     </section>
 
     <nav class="tabs" role="tablist" aria-label="Разделы">
-      <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="status" id="tab-status">Статус</button>
-      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="log" id="tab-log">Лог</button>
-      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="bypass" id="tab-bypass">Bypass</button>
-      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="key" id="tab-key">Ключ</button>
+      <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="status" id="tab-status">
+        <img class="ico" src="icons/status.svg" alt="" width="14" height="14" /> Статус
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="log" id="tab-log">
+        <img class="ico" src="icons/log.svg" alt="" width="14" height="14" /> Лог
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="bypass" id="tab-bypass">
+        <img class="ico" src="icons/bypass.svg" alt="" width="14" height="14" /> Bypass
+      </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="key" id="tab-key">
+        <img class="ico" src="icons/key.svg" alt="" width="14" height="14" /> Ключ
+      </button>
     </nav>
 
     <main>
-      <!-- STATUS -->
       <section class="panel active" id="panel-status" role="tabpanel" aria-labelledby="tab-status">
         <div class="card">
           <h2>Состояние</h2>
           <div class="stat-grid" id="status-grid">
-            <div class="stat">
-              <span class="stat-label">Outline</span>
-              <span class="stat-value" id="st-ready">—</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">Сервер</span>
-              <span class="stat-value mono" id="st-server">—</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">Ключ</span>
-              <span class="stat-value mono" id="st-key">—</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">SOCKS</span>
-              <span class="stat-value mono" id="st-socks">—</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">L3 gateway</span>
-              <span class="stat-value" id="st-gw">—</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">За минуту</span>
-              <span class="stat-value" id="st-rates">—</span>
-            </div>
+            <div class="stat"><span class="stat-label">Outline</span><span class="stat-value" id="st-ready">—</span></div>
+            <div class="stat"><span class="stat-label">Сервер</span><span class="stat-value mono" id="st-server">—</span></div>
+            <div class="stat"><span class="stat-label">Ключ</span><span class="stat-value mono" id="st-key">—</span></div>
+            <div class="stat"><span class="stat-label">SOCKS</span><span class="stat-value mono" id="st-socks">—</span></div>
+            <div class="stat"><span class="stat-label">L3</span><span class="stat-value" id="st-gw">—</span></div>
+            <div class="stat"><span class="stat-label">1 мин</span><span class="stat-value" id="st-rates">—</span></div>
           </div>
-          <p class="hint" id="status-hint">Откройте вкладку <strong>Лог</strong>, чтобы видеть, уходит ли запрос через VPN или в обход.</p>
+          <p class="hint" id="status-hint">Вкладка <strong>Лог</strong> — VPN vs Direct в реальном времени.</p>
           <p id="status-error" class="error" hidden></p>
         </div>
       </section>
 
-      <!-- LOG -->
       <section class="panel" id="panel-log" role="tabpanel" aria-labelledby="tab-log" hidden>
         <div class="card">
-          <div class="row between">
+          <div class="row between tight">
             <h2>Подключения</h2>
-            <div class="row">
+            <div class="row tight">
               <span class="live-dot" id="live-dot" title="SSE"></span>
-              <span class="muted" id="live-label">offline</span>
-              <button type="button" id="btn-pause" class="ghost">Пауза</button>
-              <button type="button" id="btn-clear-log" class="ghost">Очистить экран</button>
+              <span class="muted sm" id="live-label">off</span>
+              <button type="button" id="btn-pause" class="ghost sm">Пауза</button>
+              <button type="button" id="btn-clear-log" class="ghost sm">Очистить</button>
             </div>
           </div>
           <div class="filters row" id="log-filters">
             <button type="button" class="chip active" data-filter="all">Все</button>
-            <button type="button" class="chip" data-filter="vpn">VPN</button>
-            <button type="button" class="chip" data-filter="direct">Direct</button>
+            <button type="button" class="chip" data-filter="vpn"><img class="ico" src="icons/vpn.svg" alt="" width="11" height="11" /> VPN</button>
+            <button type="button" class="chip" data-filter="direct"><img class="ico" src="icons/direct.svg" alt="" width="11" height="11" /> Direct</button>
             <button type="button" class="chip" data-filter="socks">SOCKS</button>
             <button type="button" class="chip" data-filter="l3">L3</button>
-            <input id="log-search" type="search" placeholder="фильтр по host…" class="search" />
+            <input id="log-search" type="search" placeholder="host…" class="search" />
           </div>
-          <p class="disclaimer">
-            L3 Direct (nft bypass) в лог не попадает — виден только трафик, дошедший до transparent proxy.
-            SOCKS показывает <strong>VPN</strong> и <strong>Direct</strong> с правилом, если оно сработало.
-          </p>
+          <p class="disclaimer">Internet TCP (SOCKS + L3): VPN / Direct / Drop. RFC1918 на L3 — kernel, без записи.</p>
           <div id="log-list" class="log-list" aria-live="polite" aria-relevant="additions">
-            <p class="empty muted" id="log-empty">Пока нет подключений — сделайте запрос через SOCKS или L3.</p>
+            <p class="empty muted" id="log-empty">Нет подключений — SOCKS или L3 traffic.</p>
           </div>
         </div>
       </section>
 
-      <!-- BYPASS -->
       <section class="panel" id="panel-bypass" role="tabpanel" aria-labelledby="tab-bypass" hidden>
         <div class="card">
-          <h2>Добавить правило bypass</h2>
+          <h2>Правило bypass</h2>
           <form id="add-form" class="row">
-            <input id="rule-input" type="text" placeholder="8.8.8.8 / 10.0.0.0/8 / example.com / *.cdn.net" required />
-            <button type="submit">Добавить</button>
+            <input id="rule-input" type="text" placeholder="IP / CIDR / domain / *.mask" required />
+            <button type="submit">+</button>
           </form>
           <p id="form-error" class="error" hidden></p>
         </div>
-
         <div class="card">
-          <div class="row between">
+          <div class="row between tight">
             <h2>Список</h2>
-            <div class="row">
-              <button type="button" id="btn-refresh" class="ghost">Обновить</button>
-              <button type="button" id="btn-apply" class="ghost">Применить DNS</button>
+            <div class="row tight">
+              <button type="button" id="btn-refresh" class="ghost sm">↻</button>
+              <button type="button" id="btn-apply" class="ghost sm">DNS</button>
             </div>
           </div>
-          <p id="status" class="muted"></p>
+          <p id="status" class="muted sm"></p>
           <table>
-            <thead>
-              <tr><th>Правило</th><th>Тип</th><th></th></tr>
-            </thead>
-            <tbody id="rules-body">
-              <tr><td colspan="3" class="muted">Загрузка…</td></tr>
-            </tbody>
+            <thead><tr><th>Правило</th><th>Тип</th><th></th></tr></thead>
+            <tbody id="rules-body"><tr><td colspan="3" class="muted">…</td></tr></tbody>
           </table>
         </div>
-
         <div class="card">
           <h2>Эффективный bypass (IP)</h2>
-          <p class="muted">Системные defaults + user CIDR/IP + resolved домены (для L3).</p>
           <pre id="effective" class="code">—</pre>
         </div>
       </section>
 
-      <!-- KEY -->
       <section class="panel" id="panel-key" role="tabpanel" aria-labelledby="tab-key" hidden>
         <div class="card">
           <h2>Ключ Outline</h2>
-          <p id="outline-status" class="muted">—</p>
+          <p id="outline-status" class="muted sm">—</p>
           <form id="key-form">
-            <label for="access-key">Новый access key (<code>ss://</code> или <code>ssconf://</code>)</label>
-            <textarea id="access-key" rows="3" placeholder="ss://…@host:port" autocomplete="off" spellcheck="false"></textarea>
-            <div class="row" style="margin-top:0.6rem">
+            <label for="access-key">ss:// или ssconf://</label>
+            <textarea id="access-key" rows="2" placeholder="ss://…@host:port" autocomplete="off" spellcheck="false"></textarea>
+            <div class="row" style="margin-top:0.4rem">
               <button type="submit">Заменить ключ</button>
             </div>
           </form>
@@ -157,9 +139,7 @@
       </section>
     </main>
 
-    <footer class="muted">
-      SOCKS: match по имени хоста. L3: домены резолвятся периодически (best-effort).
-    </footer>
+    <footer class="muted sm">outline-gate v0.2.0 · SOCKS host match · L3 DNS best-effort</footer>
   </div>
   <script src="app.js"></script>
 </body>
