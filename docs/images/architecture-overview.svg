@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 420" role="img" aria-label="Архитектура outline-gate: SOCKS5 и L3 gateway">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1419"/>
+      <stop offset="100%" stop-color="#1a2332"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#8b9bb4"/>
+    </marker>
+    <marker id="arrowAccent" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#3d8bfd"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#3dd68c"/>
+    </marker>
+  </defs>
+  <rect width="920" height="420" rx="12" fill="url(#bg)"/>
+  <text x="32" y="36" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">outline-gate — обзор путей трафика</text>
+  <text x="32" y="58" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">SOCKS5 (явный proxy) · L3 gateway (default GW + nftables) · Outline / Shadowsocks</text>
+
+  <!-- LAN clients -->
+  <rect x="32" y="100" width="140" height="90" rx="10" fill="#1a2332" stroke="#2a3548" stroke-width="1.5"/>
+  <text x="102" y="140" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">LAN clients</text>
+  <text x="102" y="162" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">PC · phone · IoT</text>
+
+  <!-- outline-gate box -->
+  <rect x="260" y="80" width="360" height="260" rx="12" fill="#121a24" stroke="#3d8bfd" stroke-width="1.5"/>
+  <text x="440" y="108" text-anchor="middle" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="14" font-weight="650">outline-gate (Docker)</text>
+
+  <rect x="290" y="130" width="140" height="56" rx="8" fill="#1a2332" stroke="#2a3548"/>
+  <text x="360" y="154" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">SOCKS5 :1080</text>
+  <text x="360" y="172" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">explicit proxy</text>
+
+  <rect x="450" y="130" width="140" height="56" rx="8" fill="#1a2332" stroke="#2a3548"/>
+  <text x="520" y="154" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">L3 / nftables</text>
+  <text x="520" y="172" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">REDIRECT + bypass</text>
+
+  <rect x="290" y="210" width="140" height="56" rx="8" fill="#1a2332" stroke="#2a3548"/>
+  <text x="360" y="234" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Web UI :8080</text>
+  <text x="360" y="252" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">/ui · /readyz</text>
+
+  <rect x="450" y="210" width="140" height="56" rx="8" fill="#1a2332" stroke="#3dd68c"/>
+  <text x="520" y="234" text-anchor="middle" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Outline dialer</text>
+  <text x="520" y="252" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">ss:// · ssconf://</text>
+
+  <text x="440" y="310" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">split-tunnel: exclude | include + bypass lists</text>
+
+  <!-- Outline server -->
+  <rect x="720" y="100" width="160" height="90" rx="10" fill="#1a2332" stroke="#3dd68c" stroke-width="1.5"/>
+  <text x="800" y="140" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Outline Server</text>
+  <text x="800" y="162" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">Shadowsocks</text>
+
+  <!-- Internet -->
+  <rect x="720" y="230" width="160" height="70" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="800" y="260" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Internet</text>
+  <text x="800" y="280" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">direct or via tunnel</text>
+
+  <!-- arrows -->
+  <line x1="172" y1="130" x2="288" y2="155" stroke="#3d8bfd" stroke-width="2" marker-end="url(#arrowAccent)"/>
+  <text x="200" y="120" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="10">SOCKS</text>
+  <line x1="172" y1="165" x2="288" y2="165" stroke="#8b9bb4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="200" y="185" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">L3 / GW</text>
+
+  <line x1="590" y1="238" x2="718" y2="150" stroke="#3dd68c" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <line x1="590" y1="165" x2="718" y2="255" stroke="#8b9bb4" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text x="640" y="200" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">bypass direct</text>
+
+  <rect x="32" y="360" width="14" height="14" rx="3" fill="#3d8bfd"/>
+  <text x="54" y="372" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">явный proxy (SOCKS)</text>
+  <rect x="220" y="360" width="14" height="14" rx="3" fill="#8b9bb4"/>
+  <text x="242" y="372" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">прозрачный L3</text>
+  <rect x="380" y="360" width="14" height="14" rx="3" fill="#3dd68c"/>
+  <text x="402" y="372" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">туннель Outline</text>
+</svg>

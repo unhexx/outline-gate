@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 380" role="img" aria-label="Поток SOCKS5">
+  <rect width="920" height="380" rx="12" fill="#0f1419"/>
+  <text x="32" y="36" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">Режим SOCKS5 — явный proxy</text>
+  <text x="32" y="58" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">GATEWAY_ENABLE=false · приложение указывает proxy host:1080</text>
+
+  <!-- steps -->
+  <rect x="32" y="100" width="160" height="100" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="112" y="140" text-anchor="middle" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="22" font-weight="700">1</text>
+  <text x="112" y="168" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Приложение</text>
+  <text x="112" y="186" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">curl · browser · app</text>
+
+  <path d="M200 150 L230 150" stroke="#3d8bfd" stroke-width="2" marker-end="url(#a)"/>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#3d8bfd"/></marker>
+  </defs>
+
+  <rect x="240" y="100" width="180" height="100" rx="10" fill="#1a2332" stroke="#3d8bfd"/>
+  <text x="330" y="140" text-anchor="middle" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="22" font-weight="700">2</text>
+  <text x="330" y="168" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">SOCKS5 CONNECT</text>
+  <text x="330" y="186" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">host:1080 · no auth</text>
+
+  <path d="M428 150 L458 150" stroke="#3d8bfd" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="468" y="100" width="180" height="100" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="558" y="140" text-anchor="middle" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="22" font-weight="700">3</text>
+  <text x="558" y="168" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Bypass check</text>
+  <text x="558" y="186" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">IP / domain / *.mask</text>
+
+  <path d="M656 150 L686 150" stroke="#3d8bfd" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="696" y="90" width="190" height="55" rx="8" fill="#12261c" stroke="#3dd68c"/>
+  <text x="791" y="115" text-anchor="middle" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">tunnel → Outline</text>
+  <text x="791" y="132" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">не в bypass</text>
+
+  <rect x="696" y="160" width="190" height="55" rx="8" fill="#1a2030" stroke="#8b9bb4"/>
+  <text x="791" y="185" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">direct → Internet</text>
+  <text x="791" y="202" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">match bypass</text>
+
+  <!-- example box -->
+  <rect x="32" y="240" width="856" height="110" rx="10" fill="#121a24" stroke="#2a3548"/>
+  <text x="52" y="270" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Практика</text>
+  <text x="52" y="298" fill="#8b9bb4" font-family="ui-monospace, monospace" font-size="12">curl -x socks5h://127.0.0.1:1080 https://ifconfig.me</text>
+  <text x="52" y="322" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">Firefox: Settings → Network → Manual proxy → SOCKS5 host + port 1080 · Proxy DNS when using SOCKS v5</text>
+</svg>

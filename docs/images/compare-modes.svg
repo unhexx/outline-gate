@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 300" role="img" aria-label="Сравнение SOCKS5 и L3">
+  <rect width="920" height="300" rx="12" fill="#0f1419"/>
+  <text x="32" y="36" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">Когда что выбирать</text>
+
+  <rect x="32" y="70" width="420" height="200" rx="12" fill="#121a24" stroke="#3d8bfd"/>
+  <text x="52" y="104" fill="#3d8bfd" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="650">SOCKS5</text>
+  <text x="52" y="132" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• Настройка в приложении</text>
+  <text x="52" y="154" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• Не нужен default GW</text>
+  <text x="52" y="176" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• Точный match доменов в CONNECT</text>
+  <text x="52" y="198" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• TCP CONNECT (v1)</text>
+  <text x="52" y="220" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• compose: GATEWAY_ENABLE=false</text>
+  <text x="52" y="248" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">Ноутбук, браузер, CLI, Docker clients</text>
+
+  <rect x="478" y="70" width="410" height="200" rx="12" fill="#121a24" stroke="#3dd68c"/>
+  <text x="498" y="104" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="650">L3 gateway</text>
+  <text x="498" y="132" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• Default gateway = хост gate</text>
+  <text x="498" y="154" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• Весь TCP LAN «как VPN-роутер»</text>
+  <text x="498" y="176" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• exclude / include + nft sets</text>
+  <text x="498" y="198" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• NET_ADMIN · host network</text>
+  <text x="498" y="220" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12">• compose: docker-compose.host.yml</text>
+  <text x="498" y="248" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">Домашний роутер-замена, TV, IoT без proxy</text>
+</svg>

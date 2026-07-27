@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 440" role="img" aria-label="L3 gateway режим include">
+  <rect width="920" height="440" rx="12" fill="#0f1419"/>
+  <text x="32" y="36" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">L3 gateway · ROUTING_MODE=include</text>
+  <text x="32" y="58" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">«Через VPN только выбранные сети» · нужен TUNNEL_CIDRS · остальное = DIRECT_POLICY</text>
+
+  <rect x="320" y="90" width="280" height="46" rx="10" fill="#1a2332" stroke="#3d8bfd"/>
+  <text x="460" y="118" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Пакет от LAN (TCP dst)</text>
+
+  <line x1="460" y1="136" x2="460" y2="165" stroke="#8b9bb4" stroke-width="2"/>
+  <rect x="300" y="165" width="320" height="46" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="460" y="193" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">dst ∈ bypass ?</text>
+
+  <line x1="300" y1="188" x2="120" y2="188" stroke="#8b9bb4" stroke-width="2"/>
+  <line x1="120" y1="188" x2="120" y2="230" stroke="#8b9bb4" stroke-width="2"/>
+  <rect x="30" y="230" width="180" height="56" rx="8" fill="#1a2030" stroke="#8b9bb4"/>
+  <text x="120" y="255" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">DIRECT</text>
+  <text x="120" y="273" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">always bypass</text>
+
+  <line x1="620" y1="188" x2="720" y2="188" stroke="#8b9bb4" stroke-width="2"/>
+  <line x1="720" y1="188" x2="720" y2="230" stroke="#8b9bb4" stroke-width="2"/>
+  <rect x="560" y="230" width="320" height="46" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="720" y="258" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">dst ∈ TUNNEL_CIDRS ?</text>
+
+  <line x1="560" y1="253" x2="480" y2="253" stroke="#3dd68c" stroke-width="2"/>
+  <line x1="480" y1="253" x2="480" y2="310" stroke="#3dd68c" stroke-width="2"/>
+  <rect x="390" y="310" width="180" height="56" rx="8" fill="#12261c" stroke="#3dd68c"/>
+  <text x="480" y="335" text-anchor="middle" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">TUNNEL</text>
+  <text x="480" y="353" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">только allow-list</text>
+
+  <line x1="880" y1="253" x2="880" y2="310" stroke="#f07178" stroke-width="2"/>
+  <rect x="790" y="310" width="100" height="56" rx="8" fill="#2a1518" stroke="#f07178"/>
+  <text x="840" y="335" text-anchor="middle" fill="#f07178" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="600">else</text>
+  <text x="840" y="353" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="10">policy</text>
+
+  <rect x="32" y="390" width="856" height="32" rx="6" fill="#121a24"/>
+  <text x="52" y="411" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">DIRECT_POLICY=direct → остальное напрямую · DIRECT_POLICY=drop → drop (кроме bypass)</text>
+</svg>

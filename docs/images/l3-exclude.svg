@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 420" role="img" aria-label="L3 gateway режим exclude">
+  <rect width="920" height="420" rx="12" fill="#0f1419"/>
+  <text x="32" y="36" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="650">L3 gateway · ROUTING_MODE=exclude</text>
+  <text x="32" y="58" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">«Всё через VPN, кроме исключений» · клиент: default gateway = IP хоста outline-gate</text>
+
+  <!-- decision tree -->
+  <rect x="320" y="90" width="280" height="50" rx="10" fill="#1a2332" stroke="#3d8bfd"/>
+  <text x="460" y="120" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">Пакет от LAN (TCP dst)</text>
+
+  <line x1="460" y1="140" x2="460" y2="175" stroke="#8b9bb4" stroke-width="2"/>
+  <rect x="300" y="175" width="320" height="50" rx="10" fill="#1a2332" stroke="#2a3548"/>
+  <text x="460" y="205" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">dst ∈ bypass ?</text>
+
+  <!-- yes -->
+  <line x1="300" y1="200" x2="160" y2="200" stroke="#8b9bb4" stroke-width="2"/>
+  <line x1="160" y1="200" x2="160" y2="250" stroke="#8b9bb4" stroke-width="2"/>
+  <rect x="60" y="250" width="200" height="70" rx="10" fill="#1a2030" stroke="#8b9bb4"/>
+  <text x="160" y="280" text-anchor="middle" fill="#e7ecf3" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">YES → DIRECT</text>
+  <text x="160" y="300" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">LAN, RFC1918, UI rules</text>
+
+  <!-- no -->
+  <line x1="620" y1="200" x2="760" y2="200" stroke="#3dd68c" stroke-width="2"/>
+  <line x1="760" y1="200" x2="760" y2="250" stroke="#3dd68c" stroke-width="2"/>
+  <rect x="660" y="250" width="200" height="70" rx="10" fill="#12261c" stroke="#3dd68c"/>
+  <text x="760" y="280" text-anchor="middle" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="600">NO → TUNNEL</text>
+  <text x="760" y="300" text-anchor="middle" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">nft REDIRECT → Outline</text>
+
+  <text x="140" y="220" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="11">да</text>
+  <text x="700" y="220" fill="#3dd68c" font-family="Segoe UI, system-ui, sans-serif" font-size="11">нет</text>
+
+  <!-- footer notes -->
+  <rect x="32" y="350" width="856" height="48" rx="8" fill="#121a24" stroke="#2a3548"/>
+  <text x="52" y="380" fill="#8b9bb4" font-family="Segoe UI, system-ui, sans-serif" font-size="12">Always bypass: private nets + Outline server IP + BYPASS_* + rules из Web UI. Иначе — blackhole loop на сам сервер Outline.</text>
+</svg>
