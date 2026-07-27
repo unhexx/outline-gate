@@ -54,6 +54,21 @@ func TestSubscribeReceives(t *testing.T) {
 	}
 }
 
+func TestTTLPrunesOldEvents(t *testing.T) {
+	s := NewWithTTL(50, time.Hour)
+	old := time.Now().UTC().Add(-2 * time.Hour)
+	s.Record(Event{Host: "old", Time: old, Via: ViaTunnel, OK: true})
+	s.Record(Event{Host: "new", Via: ViaDirect, OK: true})
+	// Len prunes by TTL
+	if s.Len() != 1 {
+		t.Fatalf("len after prune=%d", s.Len())
+	}
+	snap := s.Snapshot(0)
+	if len(snap) != 1 || snap[0].Host != "new" {
+		t.Fatalf("%+v", snap)
+	}
+}
+
 func TestConcurrentRecord(t *testing.T) {
 	s := New(100)
 	var wg sync.WaitGroup

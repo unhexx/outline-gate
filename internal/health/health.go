@@ -75,5 +75,5 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("outline-gate\nhealth: /healthz /readyz\nui: /ui/\n"))
+	_, _ = w.Write([]byte("outline-gate\nhealth: /healthz /readyz\nui: /ui/\nversion: /api/v1/version\n"))
 }

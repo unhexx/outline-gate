@@ -1,6 +1,6 @@
 # Architecture
 
-**Version:** [v0.2.0](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) · diagrams: [docs/images/](images/)
+**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · diagrams: [docs/images/](images/)
 
 ```
 LAN clients ──► outline-gate ──ss:// / ssconf://──► Outline Server
@@ -41,7 +41,7 @@ See also: [architecture-overview.svg](images/architecture-overview.svg).
 4. Each attempt is recorded in `connlog` (`via=tunnel|direct|drop`).
 5. `postrouting` MASQUERADE rewrites source for return path.
 
-UDP is not fully handled in v0.2.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
+UDP is not fully handled in v0.4.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
 
 ## Data path (SOCKS5)
 

@@ -35,7 +35,28 @@
     liveLabel: document.getElementById("live-label"),
     btnPause: document.getElementById("btn-pause"),
     btnClearLog: document.getElementById("btn-clear-log"),
+    appVer: document.getElementById("app-ver"),
+    appVerFoot: document.getElementById("app-ver-foot"),
   };
+
+  function setAppVersion(v) {
+    if (!v) return;
+    if (el.appVer) el.appVer.textContent = v;
+    if (el.appVerFoot) el.appVerFoot.textContent = v;
+    document.title = "outline-gate " + v;
+  }
+
+  // Public endpoint — no token required; always reflects process build.
+  async function loadVersion() {
+    try {
+      const res = await fetch("/api/v1/version");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.version) setAppVersion(data.version);
+    } catch (_) {
+      /* keep placeholder */
+    }
+  }
 
   let events = [];
   let filter = "all";
@@ -415,6 +436,7 @@
   async function loadStatus() {
     try {
       const data = await api("/api/v1/status");
+      if (data && data.version) setAppVersion(data.version);
       renderStatus(data);
       setAuthPill(true);
     } catch (e) {
@@ -532,6 +554,7 @@
 
   el.token.value = getToken();
   setAuthPill(!!getToken());
+  loadVersion();
   loadAll();
   // refresh status periodically
   setInterval(() => {

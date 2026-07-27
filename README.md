@@ -10,9 +10,11 @@
 [![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
 [![Web UI](https://img.shields.io/badge/Web_UI-live_log-3d8bfd)](#web-ui)
 [![L3](https://img.shields.io/badge/L3-userspace_routing-3dd68c)](docs/routing.md)
-[![Version](https://img.shields.io/badge/version-v0.3.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.3.0)
+[![Version](https://img.shields.io/badge/version-v0.4.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)
+[![Module](https://img.shields.io/badge/module-unhexx%2Foutline--gate-informational)](go.mod)
+[![Metrics](https://img.shields.io/badge/metrics-/metrics-orange)](#основные-переменные)
 
-**Current release: [v0.3.0](https://github.com/unhexx/outline-gate/releases/tag/v0.3.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.3.0/outline-gate_linux_amd64)
+**Current release: [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -49,8 +51,8 @@
 ### Чем не является
 
 - Не **Outline Server / Manager** — только **клиент** к уже выданному ключу.
-- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.2.0 — TCP-first).
-- Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (только доверенная сеть).
+- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.4 — TCP-first; IPv6 L3 nft — gap).
+- Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (LAN + опционально `SOCKS_ALLOW_CIDRS`).
 
 <p align="center">
   <img src="docs/images/architecture-overview.svg" alt="Архитектура outline-gate: SOCKS5 и L3 gateway" width="920"/>
@@ -61,9 +63,9 @@
 - Клиент Outline через **outline-sdk** (`ss://`, `ssconf://`)
 - **SOCKS5** (`:1080`) — explicit proxy; bypass → direct dial
 - **L3 gateway** (nftables): `exclude` / `include`, REDIRECT + MASQUERADE
-- **Web UI** (`/ui/`): компактный UI, live-лог маршрутизации (VPN/Direct), bypass, замена ключа; API с `UI_TOKEN`
+- **Web UI** (`/ui/`): компактный UI, live-лог, bypass, замена ключа; версия процесса из `/api/v1/version`
 - Конфиг: `.env`, volume-файлы, Docker secrets, SIGHUP-reload
-- Health: `/healthz`, `/readyz`
+- Health: `/healthz`, `/readyz`; опционально Prometheus `/metrics` (`METRICS_ENABLE=true`)
 
 ## Оглавление
 
@@ -116,16 +118,17 @@ docker compose -f docker-compose.host.yml up --build -d
 | Канал | Ссылка |
 |-------|--------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
-| Latest tag | [`v0.2.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.2.0) |
+| Latest tag | [`v0.4.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
-| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.2.0`) |
+| Module path | `github.com/unhexx/outline-gate` |
+| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.4.0`) |
 
 ### Docker (рекомендуется)
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.2.0
+git checkout v0.4.0
 cd deploy/compose
 cp .env.example .env
 # OUTLINE_ACCESS_KEY=...  UI_ENABLE=true  UI_TOKEN=...
@@ -135,14 +138,14 @@ docker compose up --build -d
 Образ с меткой релиза:
 
 ```bash
-docker build -f deploy/docker/Dockerfile -t outline-gate:v0.2.0 .
+docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.4.0 -t outline-gate:v0.4.0 .
 ```
 
 ### Бинарник Linux amd64
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.2.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
 chmod +x outline-gate
 export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate
@@ -556,7 +559,8 @@ docker compose up -d --force-recreate
 | `UI_ENABLE` / `UI_TOKEN` | Web UI + API |
 | `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` | Порты на хосте (bridge compose) |
 | `SOCKS_LISTEN` / `HEALTH_LISTEN` | Слушатели в контейнере |
-| `SOCKS_ALLOW_CIDRS` / `_FILE` | Allowlist source IP для SOCKS (пусто = все) |
+| `SOCKS_ALLOW_CIDRS` / `_FILE` | Allowlist source IP для SOCKS (пусто = все; при non-loopback — `Warn` на старте) |
+| `METRICS_ENABLE` | `true` → Prometheus text на `/metrics` (health-порт) |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 
 Полный список: [`deploy/compose/.env.example`](deploy/compose/.env.example).
@@ -621,21 +625,21 @@ docker run --rm -d --name outline-gate \
 # GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.2.0
+git checkout v0.4.0
 
 # Internal
 git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
-git checkout v0.2.0
+git checkout v0.4.0
 ```
 
 ## Безопасность
 
-- SOCKS без auth — только доверенная сеть
+- SOCKS без auth — только доверенная сеть (`SOCKS_ALLOW_CIDRS` рекомендуется)
 - Не коммитьте `.env`, `*.runtime.txt` и реальные ключи
 - В логах ключ редактируется (`ss://***@host:port`)
-- API UI без токена → `401`
-- Ограничения v0.2.0: TCP-first (UDP L3 неполный), domain-bypass на L3 — best-effort
+- API UI без токена → `401` (`/api/v1/version` публичный)
+- Ограничения v0.4: TCP-first (UDP L3 неполный), IPv6 nft gap, domain-bypass на L3 — best-effort
 
 ## License
 

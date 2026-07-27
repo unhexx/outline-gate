@@ -9,20 +9,23 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/unhex/outline-gate/internal/bypass"
-	"github.com/unhex/outline-gate/internal/config"
-	"github.com/unhex/outline-gate/internal/connlog"
-	"github.com/unhex/outline-gate/internal/gateway"
-	"github.com/unhex/outline-gate/internal/health"
-	"github.com/unhex/outline-gate/internal/logging"
-	"github.com/unhex/outline-gate/internal/outline"
-	"github.com/unhex/outline-gate/internal/proxy"
-	"github.com/unhex/outline-gate/internal/routing"
-	"github.com/unhex/outline-gate/internal/webui"
+	"github.com/unhexx/outline-gate/internal/bypass"
+	"github.com/unhexx/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/connlog"
+	"github.com/unhexx/outline-gate/internal/gateway"
+	"github.com/unhexx/outline-gate/internal/health"
+	"github.com/unhexx/outline-gate/internal/logging"
+	"github.com/unhexx/outline-gate/internal/metrics"
+	"github.com/unhexx/outline-gate/internal/outline"
+	"github.com/unhexx/outline-gate/internal/proxy"
+	"github.com/unhexx/outline-gate/internal/routing"
+	"github.com/unhexx/outline-gate/internal/version"
+	"github.com/unhexx/outline-gate/internal/webui"
 )
 
 func main() {
@@ -39,12 +42,20 @@ func run() error {
 	}
 	log := logging.Setup(cfg.LogLevel, cfg.LogFormat)
 	log.Info("starting outline-gate",
+		"version", version.String(),
 		"mode", cfg.RoutingMode,
 		"gateway", cfg.GatewayEnable,
 		"socks", cfg.SOCKSListen,
 		"ui", cfg.UIEnable,
+		"metrics", cfg.MetricsEnable,
 		"access_key", config.RedactAccessKey(cfg.AccessKey),
 	)
+	if len(cfg.SOCKSAllowCIDRs) == 0 && !isLoopbackListen(cfg.SOCKSListen) {
+		log.Warn("SOCKS5 has no authentication and SOCKS_ALLOW_CIDRS is empty; "+
+			"any client that can reach the listener may use the proxy — restrict via firewall or set SOCKS_ALLOW_CIDRS",
+			"listen", cfg.SOCKSListen,
+		)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -130,11 +141,22 @@ func run() error {
 	hs.MarkStarted()
 
 	connStore := connlog.New(500)
+	var met *metrics.Registry
+	if cfg.MetricsEnable {
+		met = metrics.New()
+	}
 	connHook := proxy.NewStoreHook(func(e proxy.ConnEvent) {
 		connStore.FromFields(e.Proto, e.ClientIP, e.Target, e.Host, e.Port, e.Via, e.Rule, e.OK, e.Error, e.DurationMs)
+		if met != nil {
+			met.ObserveConnection(e.Proto, e.Via, e.OK)
+		}
 	})
 
 	mux := hs.Mux()
+	if met != nil {
+		mux.Handle("/metrics", met.Handler())
+		log.Info("prometheus metrics enabled", "path", "/metrics")
+	}
 	if cfg.UIEnable {
 		ui := &webui.Server{
 			Manager: bypassMgr,
@@ -156,13 +178,15 @@ func run() error {
 			Status: func() webui.RuntimeStatus {
 				c := getCfg()
 				return webui.RuntimeStatus{
+					Version:       version.String(),
 					SOCKSListen:   c.SOCKSListen,
 					GatewayEnable: c.GatewayEnable,
 					HealthListen:  c.HealthListen,
 				}
 			},
-			Token:  cfg.UIToken,
-			Static: webui.StaticFS(),
+			Version: version.String(),
+			Token:   cfg.UIToken,
+			Static:  webui.StaticFS(),
 		}
 		ui.Mount(mux)
 		log.Info("management UI enabled", "path", "/ui/", "key_persist", cfg.AccessKeyPersistFile)
@@ -229,10 +253,10 @@ func run() error {
 			ListenAddr:   cfg.TransproxyListen,
 			Dialer:       client,
 			DirectDialer: &net.Dialer{},
-			Decider: &l3PathDecider{
-				mu:     &mu,
-				engine: func() *routing.Engine { return engine },
-				bypass: bypassMgr,
+			Decider: &proxy.EnginePathDecider{
+				Mu:     &mu,
+				Engine: func() *routing.Engine { return engine },
+				Bypass: bypassMgr,
 			},
 			ConnLog: connHook,
 			Logger:  log,
@@ -368,7 +392,9 @@ func run() error {
 	g := gw
 	mu.Unlock()
 	if g != nil {
-		_ = g.Flush()
+		if err := g.Flush(); err != nil {
+			log.Error("gateway flush on shutdown", "err", err)
+		}
 	}
 	_ = socks.Close()
 	cancel()
@@ -398,38 +424,16 @@ func serverIPsFrom(client *outline.Client) []net.IP {
 	return nil
 }
 
-// l3PathDecider implements proxy.PathDecider using the live routing engine.
-type l3PathDecider struct {
-	mu     *sync.Mutex
-	engine func() *routing.Engine
-	bypass *bypass.Manager
-}
-
-func (d *l3PathDecider) DecidePath(dst net.IP) (via string, rule string) {
-	if d == nil || dst == nil {
-		return proxy.PathTunnel, ""
+// isLoopbackListen reports whether addr binds only to loopback (127.0.0.1 / ::1).
+func isLoopbackListen(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
 	}
-	d.mu.Lock()
-	eng := d.engine()
-	d.mu.Unlock()
-	if eng == nil {
-		return proxy.PathTunnel, ""
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// hostnames like "localhost"
+		return strings.EqualFold(host, "localhost")
 	}
-	switch eng.Decide(dst) {
-	case routing.PathDrop:
-		return proxy.PathDrop, "policy:drop"
-	case routing.PathDirect:
-		if eng.IsServerIP(dst) {
-			return proxy.PathDirect, "outline-server"
-		}
-		if d.bypass != nil {
-			if ok, r := d.bypass.MatchBypass(dst.String()); ok {
-				return proxy.PathDirect, r
-			}
-		}
-		// include-mode residual Direct, or static bypass nets not in user store
-		return proxy.PathDirect, "policy:direct"
-	default:
-		return proxy.PathTunnel, ""
-	}
+	return ip.IsLoopback()
 }

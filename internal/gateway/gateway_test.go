@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/unhex/outline-gate/internal/config"
-	"github.com/unhex/outline-gate/internal/routing"
+	"github.com/unhexx/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/routing"
 )
 
 func TestDryRunExclude(t *testing.T) {
