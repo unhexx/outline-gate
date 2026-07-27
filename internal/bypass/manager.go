@@ -137,49 +137,59 @@ func (m *Manager) SetRules(ctx context.Context, raws []string) error {
 
 // MatchHost reports SOCKS/domain bypass.
 func (m *Manager) MatchHost(host string) bool {
-	m.mu.RLock()
-	matcher := m.matcher
-	m.mu.RUnlock()
-	if matcher == nil {
-		return false
-	}
-	return matcher.MatchHost(host)
+	ok, _ := m.MatchBypass(host)
+	return ok
 }
 
 // MatchIP reports whether IP matches user IP/CIDR rules (not resolved domain IPs).
 // For SOCKS with IP target, also check EffectiveBypassNets via routing engine.
 func (m *Manager) MatchIP(ip net.IP) bool {
+	ok, _ := m.matchIPDetail(ip)
+	return ok
+}
+
+// MatchBypass reports whether host (name or IP literal) should skip the tunnel
+// and, when known, the user rule Raw that matched.
+func (m *Manager) MatchBypass(host string) (bool, string) {
+	host = NormalizeHost(host)
+	if host == "" {
+		return false, ""
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return m.matchIPDetail(ip)
+	}
 	m.mu.RLock()
 	matcher := m.matcher
 	m.mu.RUnlock()
 	if matcher == nil {
-		return false
+		return false, ""
 	}
-	if matcher.MatchIP(ip) {
-		return true
-	}
-	// Also treat resolved domain IPs as bypass for SOCKS IP connect.
+	return matcher.MatchHostDetail(host)
+}
+
+func (m *Manager) matchIPDetail(ip net.IP) (bool, string) {
 	m.mu.RLock()
+	matcher := m.matcher
 	resolved := m.resolved
 	m.mu.RUnlock()
-	for i := range resolved {
-		if resolved[i].Contains(ip) {
-			return true
+	if matcher != nil {
+		if ok, rule := matcher.MatchIPDetail(ip); ok {
+			return true, rule
 		}
 	}
-	return false
+	// Also treat resolved domain IPs as bypass for SOCKS IP connect.
+	for i := range resolved {
+		if resolved[i].Contains(ip) {
+			return true, "dns-resolved"
+		}
+	}
+	return false, ""
 }
 
 // ShouldBypassHost is true if host (name or IP literal) should skip the tunnel.
 func (m *Manager) ShouldBypassHost(host string) bool {
-	host = NormalizeHost(host)
-	if host == "" {
-		return false
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return m.MatchIP(ip)
-	}
-	return m.MatchHost(host)
+	ok, _ := m.MatchBypass(host)
+	return ok
 }
 
 // EffectiveBypassNets returns static + user IP/CIDR + resolved domain IPs.

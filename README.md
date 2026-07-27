@@ -11,33 +11,70 @@
 
 **Current release: [v0.1.0](https://github.com/unhexx/outline-gate/releases/tag/v0.1.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.1.0/outline-gate_linux_amd64)
 
-Docker LAN-шлюз к [Outline](https://getoutline.org/) (Shadowsocks): **SOCKS5**, опциональный **L3 split-tunnel** и **Web UI**.
+## О продукте
+
+**outline-gate** — самодостаточный Docker-шлюз, который превращает [Outline](https://getoutline.org/) (Shadowsocks) access key в **рабочий VPN-доступ для LAN и приложений**: без клиентского GUI на каждом устройстве, с **split-tunnel** и **быстрым управлением исключениями**.
+
+Один контейнер на Linux-хосте:
+
+1. поднимает клиент Outline (`ss://` / `ssconf://`);
+2. отдаёт **SOCKS5** для выборочного proxy;
+3. опционально становится **default gateway** (L3 + nftables) для всего TCP-трафика сети;
+4. даёт **Web UI** для списка «не через VPN» и смены ключа без пересборки образа.
+
+### Какие задачи решает оперативно
+
+| Задача | Как outline-gate закрывает |
+|--------|----------------------------|
+| **VPN «на всю сеть»** без Outline Client на TV, IoT, смартфонах | L3: клиенты ставят GW на хост — трафик идёт через Outline |
+| **VPN только для части приложений** | SOCKS5 `:1080` в браузере, curl, Git, Docker — остальное без proxy |
+| **Split-tunnel: «всё через VPN, кроме…»** | Режим `exclude` + bypass (RFC1918, IP/CIDR, домены, `*.mask`) |
+| **Split-tunnel: «через VPN только выбранное»** | Режим `include` + `TUNNEL_CIDRS` (+ `direct` / `drop` для остального) |
+| **Не ломать локальную сеть и банки / внутренние API** | Always-bypass частных сетей + UI/API-список исключений |
+| **Сменить Outline-ключ без деплоя** | Web UI / `PUT /api/v1/outline` → reconnect + persist-файл |
+| **Быстро добавить «не гонять через VPN»** | Web UI: IP, подсеть, `example.com`, `*.cdn.example.net` |
+| **Проверить, что туннель жив** | `/readyz`, healthcheck Docker, egress-check через SOCKS |
+| **Единый сервис вместо зоопарка клиентов** | Compose + `.env` / secrets; ключ не вшит в образ |
+| **Динамический ключ провайдера** | Поддержка `ssconf://` (раскрытие при Connect) |
+
+### Для кого
+
+- **Дом / малый офис** — один always-on Linux (NUC, mini-PC, VM): «роутер с Outline».
+- **Разработка и ops** — SOCKS для CLI/IDE/контейнеров, без смены системного VPN.
+- **Админы LAN** — централизованный egress и политика exclude/include, не per-device apps.
+
+### Чем не является
+
+- Не **Outline Server / Manager** — только **клиент** к уже выданному ключу.
+- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.1.0 — TCP-first).
+- Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (только доверенная сеть).
 
 <p align="center">
   <img src="docs/images/architecture-overview.svg" alt="Архитектура outline-gate: SOCKS5 и L3 gateway" width="920"/>
 </p>
 
-## Возможности
+## Возможности (технически)
 
-- Клиент Outline через **outline-sdk** (`ss://` и динамические `ssconf://`)
-- Локальный **SOCKS5** (`:1080`) — явный proxy для приложений
-- Опциональный **L3 gateway** (nftables): режимы `exclude` / `include`
-- **Web UI** (`/ui/`): исключения (IP / CIDR / домены / `*.mask`) и **замена ключа Outline**
-- Параметры: `.env`, volume-файлы, Docker secrets
-- Health: `/healthz`, `/readyz` (без auth; API UI — с `UI_TOKEN`)
+- Клиент Outline через **outline-sdk** (`ss://`, `ssconf://`)
+- **SOCKS5** (`:1080`) — explicit proxy; bypass → direct dial
+- **L3 gateway** (nftables): `exclude` / `include`, REDIRECT + MASQUERADE
+- **Web UI** (`/ui/`): статус, live-лог маршрутизации (VPN/Direct), bypass, замена ключа; API с `UI_TOKEN`
+- Конфиг: `.env`, volume-файлы, Docker secrets, SIGHUP-reload
+- Health: `/healthz`, `/readyz`
 
 ## Оглавление
 
-1. [Быстрый старт](#быстрый-старт)
-2. [Релиз и установка](#релиз-и-установка)
-3. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
-4. [Использование SOCKS5](#использование-socks5)
-5. [Использование L3 gateway](#использование-l3-gateway)
-6. [Web UI](#web-ui)
-7. [Переменные окружения](#основные-переменные)
-8. [Сборка образа](#сборка-образа)
-9. [Best practices](#best-practices)
-10. [Документация](#документация)
+1. [О продукте](#о-продукте)
+2. [Быстрый старт](#быстрый-старт)
+3. [Релиз и установка](#релиз-и-установка)
+4. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
+5. [Использование SOCKS5](#использование-socks5)
+6. [Использование L3 gateway](#использование-l3-gateway)
+7. [Web UI](#web-ui)
+8. [Переменные окружения](#основные-переменные)
+9. [Сборка образа](#сборка-образа)
+10. [Best practices](#best-practices)
+11. [Документация](#документация)
 
 ---
 
@@ -481,10 +518,15 @@ docker compose up -d --force-recreate
 
 | URL | Auth | Назначение |
 |-----|------|------------|
-| `/ui/` | токен для API | SPA |
+| `/ui/` | токен для API | Web UI (вкладки: Статус · Лог · Bypass · Ключ) |
+| `GET /api/v1/status` | Bearer / Basic | сводка ready / SOCKS / gateway / connlog |
+| `GET /api/v1/connections` | Bearer / Basic | снимок ring-buffer подключений |
+| `GET /api/v1/connections/stream` | Bearer / Basic / `?token=` | SSE live-лог (EventSource) |
 | `GET/PUT /api/v1/outline` | Bearer / Basic | статус / замена ключа |
 | `GET/POST/DELETE /api/v1/bypass` | Bearer / Basic | правила исключений |
 | `/healthz`, `/readyz` | нет | healthcheck |
+
+**Лог подключений:** для SOCKS видно цепочку `клиент → SOCKS → VPN|Direct → host` (и сработавшее правило bypass). Для L3 — только трафик, попавший в transparent proxy (почти всегда **VPN**); nft Direct bypass в приложение не приходит.
 
 Ключ, заменённый в UI → `OUTLINE_KEY_PERSIST_FILE` (по умолчанию `/config/outline_key.runtime.txt`), при старте **приоритетнее** `OUTLINE_ACCESS_KEY`.
 

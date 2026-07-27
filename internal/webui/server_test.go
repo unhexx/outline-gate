@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/unhex/outline-gate/internal/bypass"
 	"github.com/unhex/outline-gate/internal/config"
+	"github.com/unhex/outline-gate/internal/connlog"
 )
 
 type fakeOutline struct {
@@ -115,6 +118,77 @@ func TestAPIAuthAndCRUD(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ui/", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("ui: %d", rr.Code)
+	}
+}
+
+func TestConnectionsAPIAndSSE(t *testing.T) {
+	store := connlog.New(10)
+	store.Record(connlog.Event{
+		Proto: connlog.ProtoSOCKS, Host: "example.com", Target: "example.com:443",
+		Via: connlog.ViaDirect, OK: true, ClientIP: "10.0.0.1",
+	})
+	srv := &Server{ConnLog: store, Token: "secret"}
+	mux := http.NewServeMux()
+	srv.Mount(mux)
+
+	// unauthorized
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/connections", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", rr.Code)
+	}
+
+	// snapshot
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/connections", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("%d %s", rr.Code, rr.Body.String())
+	}
+	var body struct {
+		Events []connlog.Event `json:"events"`
+		Count  int             `json:"count"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Count != 1 || len(body.Events) != 1 || body.Events[0].Host != "example.com" {
+		t.Fatalf("%+v", body)
+	}
+
+	// SSE with query token
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req = httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/connections/stream?token=secret", nil)
+	rr = httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		mux.ServeHTTP(rr, req)
+		close(done)
+	}()
+	// wait for snapshot flush
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(rr.Body.String(), "event: snapshot") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	out := rr.Body.String()
+	if !strings.Contains(out, "event: snapshot") || !strings.Contains(out, "example.com") {
+		t.Fatalf("sse body: %s", out)
+	}
+
+	// status
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: %d %s", rr.Code, rr.Body.String())
 	}
 }
 

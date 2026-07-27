@@ -25,6 +25,31 @@ type BypassChecker interface {
 	ShouldBypassHost(host string) bool
 }
 
+// BypassMatcher is an optional richer bypass interface that returns the
+// matched rule string for the connection log.
+type BypassMatcher interface {
+	MatchBypass(host string) (bypass bool, rule string)
+}
+
+// ConnRecorder records connection routing events for the management UI.
+type ConnRecorder interface {
+	RecordConnect(e ConnEvent)
+}
+
+// ConnEvent is a lightweight proxy-side connection record.
+type ConnEvent struct {
+	Proto      string // "socks" | "l3"
+	ClientIP   string
+	Target     string
+	Host       string
+	Port       int
+	Via        string // "tunnel" | "direct"
+	Rule       string
+	OK         bool
+	Error      string
+	DurationMs int64
+}
+
 // SOCKS5 is a minimal SOCKS5 (no-auth, CONNECT only) server.
 type SOCKS5 struct {
 	ListenAddr string
@@ -34,7 +59,9 @@ type SOCKS5 struct {
 	DirectDialer Dialer
 	// Bypass optionally selects direct path for excluded hosts/IPs.
 	Bypass BypassChecker
-	Logger *slog.Logger
+	// ConnLog optionally records each CONNECT for the live UI log.
+	ConnLog ConnRecorder
+	Logger  *slog.Logger
 	Timeout time.Duration
 
 	ln net.Listener
@@ -158,27 +185,49 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 		return
 	}
 	port := binary.BigEndian.Uint16(buf[:2])
-	target := net.JoinHostPort(host, strconv.Itoa(int(port)))
+	portInt := int(port)
+	target := net.JoinHostPort(host, strconv.Itoa(portInt))
+	clientIP := clientIPOf(conn)
 
 	dctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	dialer := s.Dialer
 	via := "tunnel"
-	if s.Bypass != nil && s.Bypass.ShouldBypassHost(host) {
-		via = "direct"
-		if s.DirectDialer != nil {
-			dialer = s.DirectDialer
-		} else {
-			dialer = &net.Dialer{}
+	rule := ""
+	if s.Bypass != nil {
+		if bm, ok := s.Bypass.(BypassMatcher); ok {
+			if bypass, r := bm.MatchBypass(host); bypass {
+				via = "direct"
+				rule = r
+			}
+		} else if s.Bypass.ShouldBypassHost(host) {
+			via = "direct"
+		}
+		if via == "direct" {
+			if s.DirectDialer != nil {
+				dialer = s.DirectDialer
+			} else {
+				dialer = &net.Dialer{}
+			}
 		}
 	}
+	start := time.Now()
 	remote, err := dialer.DialContext(dctx, "tcp", target)
+	dur := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
+		s.record(ConnEvent{
+			Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
+			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,
+		})
 		_, _ = conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 	log.Debug("SOCKS connect", "target", target, "via", via)
+	s.record(ConnEvent{
+		Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
+		Via: via, Rule: rule, OK: true, DurationMs: dur,
+	})
 	defer remote.Close()
 
 	// success
@@ -187,6 +236,23 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	}
 	_ = conn.SetDeadline(time.Time{})
 	relay(conn, remote)
+}
+
+func (s *SOCKS5) record(e ConnEvent) {
+	if s.ConnLog != nil {
+		s.ConnLog.RecordConnect(e)
+	}
+}
+
+func clientIPOf(conn net.Conn) string {
+	if conn == nil || conn.RemoteAddr() == nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return conn.RemoteAddr().String()
+	}
+	return host
 }
 
 func relay(a, b net.Conn) {
