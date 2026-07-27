@@ -70,6 +70,9 @@ type Config struct {
 	// AccessKeyPersistFile is where the UI writes a replaced Outline key (survives restart).
 	// Loaded with highest priority when non-empty.
 	AccessKeyPersistFile string
+	// SOCKSAllowCIDRs limits SOCKS5 client source IPs. Empty means allow all
+	// (trusted LAN only — SOCKS has no authentication).
+	SOCKSAllowCIDRs []net.IPNet
 }
 
 // Load reads configuration from the process environment.
@@ -191,6 +194,12 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		return nil, fmt.Errorf("tunnel CIDRs: %w", err)
 	}
 	cfg.TunnelCIDRs = tunnel
+
+	socksAllow, err := loadCIDRs(getenv, "SOCKS_ALLOW_CIDRS", "SOCKS_ALLOW_CIDRS_FILE")
+	if err != nil {
+		return nil, fmt.Errorf("SOCKS allow CIDRs: %w", err)
+	}
+	cfg.SOCKSAllowCIDRs = socksAllow
 
 	if host, portStr, err := net.SplitHostPort(cfg.TransproxyListen); err == nil {
 		p, err := strconv.Atoi(portStr)
