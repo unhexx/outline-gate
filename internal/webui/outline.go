@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/unhex/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/config"
 )
 
 // OutlineController exposes live Outline key status and replace.

@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Published releases: https://github.com/unhexx/outline-gate/releases
 
+## [0.4.0] — 2026-07-27
+
+### Added
+
+- Build-time version (`internal/version`) shown in Web UI header/footer via public `GET /api/v1/version`
+- Version also in `GET /api/v1/status` and startup logs
+- Optional Prometheus metrics at `/metrics` (`METRICS_ENABLE=true`)
+- IPv6 `IP6T_SO_ORIGINAL_DST` recovery in transparent proxy (nft L3 sets remain IPv4-only)
+- SOCKS startup **Warn** when listen is non-loopback and `SOCKS_ALLOW_CIDRS` is empty
+- connlog event **TTL** (default 1h) in addition to ring capacity
+- `proxy.EnginePathDecider` (moved L3 path mapping out of `main`)
+
+### Fixed
+
+- Web UI no longer hardcodes stale `v0.2.0` — displays process build version
+- `gateway.Flush` returns real nft errors (was always `nil`)
+- `gateway.UpdateEngine` uses single lock path with re-apply (no race with `Flush`)
+- `nft` resolved via `LookPath` / `/usr/sbin/nft` (not bare PATH-only)
+- clearer `ip_forward` errors with CAP_NET_ADMIN hint
+- bypass rules file: temp write + **fsync** + rename
+- Go module path aligned with GitHub: `github.com/unhexx/outline-gate`
+
+### Changed
+
+- Dockerfile/Makefile inject `VERSION` via `-ldflags`
+- README badges and install docs for v0.4.0
+
 ## [0.3.0] — 2026-07-27
 
 ### Added

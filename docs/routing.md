@@ -1,6 +1,6 @@
 # Routing modes
 
-**Version:** [v0.3.0](https://github.com/unhexx/outline-gate/releases/tag/v0.3.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
+**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
 
 ## Always bypass
 
@@ -73,7 +73,7 @@ DIRECT_POLICY=direct
 
 ## IPv6 (known gap)
 
-L3 nftables sets use `type ipv4_addr`. IPv6 destinations are **not** redirected into the transparent proxy; on dual-stack hosts IPv6 traffic leaves the host **directly** (bypasses Outline). SOCKS5 rejects IPv6 ATYP (`0x04`). Full dual-stack is roadmap, not v0.3.
+L3 nftables sets use `type ipv4_addr`. IPv6 destinations are **not** redirected into the transparent proxy; on dual-stack hosts IPv6 traffic leaves the host **directly** (bypasses Outline). SOCKS5 rejects IPv6 ATYP (`0x04`). Full dual-stack is roadmap, not v0.4.
 
 ## Reload
 

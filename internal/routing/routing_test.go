@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/unhex/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/config"
 )
 
 func mustCIDR(s string) net.IPNet {

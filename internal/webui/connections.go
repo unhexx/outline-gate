@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/unhex/outline-gate/internal/connlog"
+	"github.com/unhexx/outline-gate/internal/connlog"
 )
 
 // ConnLog is the read side of the connection event store for the UI.
@@ -138,11 +138,17 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{}
+	if s.Version != "" {
+		out["version"] = s.Version
+	}
 	if s.Outline != nil {
 		out["outline"] = s.Outline.Status()
 	}
 	if s.Status != nil {
 		st := s.Status()
+		if st.Version != "" {
+			out["version"] = st.Version
+		}
 		out["socks"] = st.SOCKSListen
 		out["gateway"] = st.GatewayEnable
 		out["health"] = st.HealthListen

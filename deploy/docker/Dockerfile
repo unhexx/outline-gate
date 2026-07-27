@@ -1,12 +1,15 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.26-alpine AS build
+ARG VERSION=0.4.0
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/outline-gate ./cmd/outline-gate
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-s -w -X github.com/unhexx/outline-gate/internal/version.Version=${VERSION}" \
+    -o /out/outline-gate ./cmd/outline-gate
 
 FROM alpine:3.21
 # Soft-pin nftables major.minor to avoid silent breaking upgrades on rebuild.

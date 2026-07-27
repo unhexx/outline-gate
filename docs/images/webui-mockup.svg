@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="Web UI outline-gate v0.2.0 compact">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="Web UI outline-gate v0.4.0 compact">
   <rect width="800" height="480" rx="12" fill="#0f1419"/>
   <rect x="20" y="16" width="760" height="448" rx="10" fill="#1a2332" stroke="#2a3548"/>
   <rect x="20" y="16" width="760" height="32" rx="10" fill="#121a24"/>
@@ -12,7 +12,7 @@
   <rect x="36" y="60" width="22" height="22" rx="6" fill="#1a2332" stroke="#3d8bfd"/>
   <circle cx="47" cy="72" r="3" fill="#3d8bfd"/>
   <text x="66" y="70" fill="#e7ecf3" font-family="Segoe UI,system-ui,sans-serif" font-size="14" font-weight="650">outline-gate</text>
-  <text x="168" y="70" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">v0.2.0</text>
+  <text x="168" y="70" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">v0.4.0</text>
   <text x="66" y="84" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">split-tunnel · live log · SOCKS + L3</text>
 
   <rect x="620" y="62" width="72" height="18" rx="9" fill="#1a3d2a"/>
@@ -71,6 +71,6 @@
   <text x="252" y="310" text-anchor="middle" fill="#e6c07b" font-size="8" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">Direct</text>
   <text x="286" y="310" fill="#e7ecf3" font-family="ui-monospace,monospace" font-size="9">→ 8.8.8.8:53  ✓  rule: 8.8.8.8</text>
 
-  <text x="40" y="360" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">Compact UI · path chains · icons · SSE live log · v0.2.0</text>
+  <text x="40" y="360" fill="#8b9bb4" font-family="Segoe UI,system-ui,sans-serif" font-size="9">Compact UI · path chains · icons · SSE live log · v0.4.0</text>
   <text x="40" y="380" fill="#5a6a82" font-family="Segoe UI,system-ui,sans-serif" font-size="8">RFC1918 on L3 stays kernel-path (not logged)</text>
 </svg>

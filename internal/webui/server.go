@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/unhex/outline-gate/internal/bypass"
+	"github.com/unhexx/outline-gate/internal/bypass"
 )
 
 // Manager is the bypass control plane used by handlers.
@@ -26,6 +26,7 @@ type Manager interface {
 
 // RuntimeStatus is optional process info for the status tab.
 type RuntimeStatus struct {
+	Version       string
 	SOCKSListen   string
 	GatewayEnable bool
 	HealthListen  string
@@ -37,16 +38,20 @@ type Server struct {
 	Outline OutlineController // optional: key status / replace
 	ConnLog ConnLog           // optional: live connection log
 	Status  func() RuntimeStatus
+	// Version is the process release string (e.g. "v0.4.0"); exposed publicly.
+	Version string
 	Token   string
 	Static  fs.FS // usually //go:embed static
 }
 
 // Mount registers UI and API routes on mux. Health routes stay separate.
-// Static UI is public (no secrets); all /api/* calls require Token.
+// Static UI is public (no secrets); all /api/* calls require Token except /api/v1/version.
 func (s *Server) Mount(mux *http.ServeMux) {
 	if s == nil {
 		return
 	}
+	// Public: UI needs version before auth.
+	mux.HandleFunc("/api/v1/version", s.handleVersion)
 	if s.Manager != nil {
 		api := http.HandlerFunc(s.routeBypassAPI)
 		mux.Handle("/api/v1/bypass", tokenAuth(s.Token, api))
@@ -74,6 +79,22 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	mux.Handle("/ui", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)
 	}))
+}
+
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	v := s.Version
+	if v == "" && s.Status != nil {
+		v = s.Status().Version
+	}
+	if v == "" {
+		v = "vdev"
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"version": v})
 }
 
 func (s *Server) routeBypassAPI(w http.ResponseWriter, r *http.Request) {

@@ -100,7 +100,6 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 	clientIP := clientIPOf(conn)
 	orig, err := originalDST(conn)
 	if err != nil {
-		// IPv6 REDIRECT uses IP6T_SO_ORIGINAL_DST (not implemented in v1).
 		t.Logger.Warn("SO_ORIGINAL_DST failed", "err", err, "remote", conn.RemoteAddr())
 		return
 	}
@@ -170,7 +169,10 @@ func (t *Transparent) record(e ConnEvent) {
 	}
 }
 
-// originalDST recovers the pre-REDIRECT destination (IPv4).
+// SO_ORIGINAL_DST / IP6T_SO_ORIGINAL_DST (linux netfilter).
+const soOriginalDst = 80
+
+// originalDST recovers the pre-REDIRECT destination (IPv4 or IPv6).
 func originalDST(conn net.Conn) (string, error) {
 	tcp, ok := conn.(*net.TCPConn)
 	if !ok {
@@ -180,12 +182,59 @@ func originalDST(conn net.Conn) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	const soOriginalDst = 80 // linux/include/uapi/linux/netfilter_ipv4.h
+
+	// Prefer family of the local address after REDIRECT.
+	tryV4, tryV6 := true, true
+	if la, ok := tcp.LocalAddr().(*net.TCPAddr); ok && la.IP != nil {
+		if la.IP.To4() != nil {
+			tryV6 = false
+		} else {
+			tryV4 = false
+		}
+	}
+
+	var last error
+	if tryV4 {
+		if s, err := originalDST4(rc); err == nil {
+			return s, nil
+		} else {
+			last = err
+		}
+	}
+	if tryV6 {
+		if s, err := originalDST6(rc); err == nil {
+			return s, nil
+		} else {
+			last = err
+		}
+	}
+	// Fallbacks if family heuristic was wrong.
+	if !tryV4 {
+		if s, err := originalDST4(rc); err == nil {
+			return s, nil
+		} else {
+			last = err
+		}
+	}
+	if !tryV6 {
+		if s, err := originalDST6(rc); err == nil {
+			return s, nil
+		} else {
+			last = err
+		}
+	}
+	if last == nil {
+		last = fmt.Errorf("SO_ORIGINAL_DST unavailable")
+	}
+	return "", last
+}
+
+func originalDST4(rc syscall.RawConn) (string, error) {
 	var (
 		addr syscall.RawSockaddrInet4
 		cerr error
 	)
-	err = rc.Control(func(fd uintptr) {
+	err := rc.Control(func(fd uintptr) {
 		size := uint32(unsafe.Sizeof(addr))
 		_, _, errno := syscall.Syscall6(
 			syscall.SYS_GETSOCKOPT,
@@ -207,7 +256,40 @@ func originalDST(conn net.Conn) (string, error) {
 		return "", cerr
 	}
 	ip := net.IPv4(addr.Addr[0], addr.Addr[1], addr.Addr[2], addr.Addr[3])
-	// sin_port is network byte order in the kernel structure.
+	port := int(binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&addr.Port))[:]))
+	return net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port)), nil
+}
+
+func originalDST6(rc syscall.RawConn) (string, error) {
+	// linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h — IP6T_SO_ORIGINAL_DST = 80
+	// level = IPPROTO_IPV6
+	var (
+		addr syscall.RawSockaddrInet6
+		cerr error
+	)
+	err := rc.Control(func(fd uintptr) {
+		size := uint32(unsafe.Sizeof(addr))
+		_, _, errno := syscall.Syscall6(
+			syscall.SYS_GETSOCKOPT,
+			fd,
+			uintptr(syscall.IPPROTO_IPV6),
+			uintptr(soOriginalDst),
+			uintptr(unsafe.Pointer(&addr)),
+			uintptr(unsafe.Pointer(&size)),
+			0,
+		)
+		if errno != 0 {
+			cerr = errno
+		}
+	})
+	if err != nil {
+		return "", err
+	}
+	if cerr != nil {
+		return "", cerr
+	}
+	ip := make(net.IP, 16)
+	copy(ip, addr.Addr[:])
 	port := int(binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&addr.Port))[:]))
 	return net.JoinHostPort(ip.String(), fmt.Sprintf("%d", port)), nil
 }

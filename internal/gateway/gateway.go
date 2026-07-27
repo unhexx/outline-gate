@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/unhex/outline-gate/internal/config"
-	"github.com/unhex/outline-gate/internal/routing"
+	"github.com/unhexx/outline-gate/internal/config"
+	"github.com/unhexx/outline-gate/internal/routing"
 )
 
 const tableName = "outline_gate"
@@ -22,6 +22,8 @@ type Gateway struct {
 	logger *slog.Logger
 	mu     sync.Mutex
 	active bool
+	// nftBin is resolved once (LookPath or common absolute paths).
+	nftBin string
 }
 
 // New creates a Gateway controller (rules not applied until Apply).
@@ -43,9 +45,17 @@ func (g *Gateway) Active() bool {
 func (g *Gateway) Apply() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	return g.applyLocked()
+}
 
+// applyLocked assumes g.mu is held.
+func (g *Gateway) applyLocked() error {
 	if err := ensureIPForward(); err != nil {
-		g.logger.Warn("ip_forward", "err", err)
+		// Non-fatal for Apply: rules may still work if host already forwards.
+		g.logger.Error("ip_forward not enabled",
+			"err", err,
+			"hint", "run with CAP_NET_ADMIN / --privileged / sysctl net.ipv4.ip_forward=1",
+		)
 	}
 
 	script, err := g.buildNFTScript()
@@ -55,8 +65,8 @@ func (g *Gateway) Apply() error {
 	g.logger.Debug("nft script", "script", script)
 
 	// Replace table atomically: delete if exists, then add.
-	_ = runNFT(fmt.Sprintf("delete table inet %s", tableName))
-	if err := runNFT(script); err != nil {
+	_ = g.runNFTLocked(fmt.Sprintf("delete table inet %s", tableName))
+	if err := g.runNFTLocked(script); err != nil {
 		g.active = false
 		return fmt.Errorf("nft apply: %w", err)
 	}
@@ -72,29 +82,26 @@ func (g *Gateway) Apply() error {
 func (g *Gateway) Flush() error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	err := runNFT(fmt.Sprintf("delete table inet %s", tableName))
-	// ignore "does not exist"
-	if err != nil && !strings.Contains(err.Error(), "No such file") && !strings.Contains(strings.ToLower(err.Error()), "does not exist") {
-		// nft returns non-zero if missing — treat as ok if table gone
-		if !strings.Contains(err.Error(), "not found") {
-			g.logger.Debug("flush", "err", err)
-		}
-	}
+	err := g.runNFTLocked(fmt.Sprintf("delete table inet %s", tableName))
 	g.active = false
+	if err != nil && !isNFTNotFound(err) {
+		g.logger.Error("gateway flush failed", "err", err)
+		return fmt.Errorf("nft flush: %w", err)
+	}
 	g.logger.Info("gateway rules flushed")
 	return nil
 }
 
 // UpdateEngine swaps the routing engine and re-applies if active.
+// Uses a single lock path so Flush cannot race between active check and Apply.
 func (g *Gateway) UpdateEngine(engine *routing.Engine) error {
 	g.mu.Lock()
-	was := g.active
+	defer g.mu.Unlock()
 	g.engine = engine
-	g.mu.Unlock()
-	if was {
-		return g.Apply()
+	if !g.active {
+		return nil
 	}
-	return nil
+	return g.applyLocked()
 }
 
 func (g *Gateway) buildNFTScript() (string, error) {
@@ -112,6 +119,7 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	// @private: RFC1918/reserved — kernel path only (no log flood).
 	// All other TCP is REDIRECTed to transparent proxy; tunnel vs Direct
 	// is decided in userspace so both appear in the connection log.
+	// Note: IPv4-only sets; IPv6 is not redirected (see docs).
 	fmt.Fprintf(&b, "add set inet %s private { type ipv4_addr; flags interval; }\n", tableName)
 	for _, n := range config.DefaultBypassCIDRs() {
 		if n.IP.To4() == nil {
@@ -142,8 +150,12 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	return b.String(), nil
 }
 
-func runNFT(script string) error {
-	cmd := exec.Command("nft", "-f", "-")
+func (g *Gateway) runNFTLocked(script string) error {
+	bin, err := g.resolveNFT()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(bin, "-f", "-")
 	cmd.Stdin = strings.NewReader(script)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -152,16 +164,47 @@ func runNFT(script string) error {
 	return nil
 }
 
+func (g *Gateway) resolveNFT() (string, error) {
+	if g.nftBin != "" {
+		return g.nftBin, nil
+	}
+	if p, err := exec.LookPath("nft"); err == nil {
+		g.nftBin = p
+		return p, nil
+	}
+	for _, cand := range []string{"/usr/sbin/nft", "/sbin/nft", "/usr/bin/nft"} {
+		if st, err := os.Stat(cand); err == nil && !st.IsDir() {
+			g.nftBin = cand
+			return cand, nil
+		}
+	}
+	return "", fmt.Errorf("nft binary not found in PATH or /usr/sbin/nft (install nftables)")
+}
+
+func isNFTNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such file") ||
+		strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "not found") ||
+		strings.Contains(msg, "no such file or directory")
+}
+
 func ensureIPForward() error {
 	const path = "/proc/sys/net/ipv4/ip_forward"
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read %s: %w (need host network / proc mount?)", path, err)
 	}
 	if strings.TrimSpace(string(b)) == "1" {
 		return nil
 	}
-	return os.WriteFile(path, []byte("1\n"), 0o644)
+	if err := os.WriteFile(path, []byte("1\n"), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w (need CAP_NET_ADMIN or set sysctl net.ipv4.ip_forward=1 on the host)", path, err)
+	}
+	return nil
 }
 
 // DryRunScript returns the nft script without applying (for tests).
