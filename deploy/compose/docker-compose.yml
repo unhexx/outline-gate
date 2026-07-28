@@ -51,6 +51,9 @@ services:
       OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
       # Prometheus text exposition on HEALTH_LISTEN (/metrics). Off by default.
       METRICS_ENABLE: ${METRICS_ENABLE:-false}
+      # Optional SOCKS source allowlist (CSV / file). Empty = accept all.
+      SOCKS_ALLOW_CIDRS: ${SOCKS_ALLOW_CIDRS:-}
+      SOCKS_ALLOW_CIDRS_FILE: ${SOCKS_ALLOW_CIDRS_FILE:-}
     volumes:
       # rw: UI/API пишет bypass.rules.txt; static CIDR-файлы тоже здесь
       - ./config:/config

@@ -2,11 +2,15 @@
 
 **Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
 
+> **Быстрый деплой на новый хост:** см. отдельную инструкцию **[DEPLOY.ru.md](DEPLOY.ru.md)**  
+> (`configure.sh` → `install.sh` → проверка). Этот документ — полный справочник.
+
 | | |
 |--|--|
 | GitHub | https://github.com/unhexx/outline-gate |
 | aservice | https://git.aservice24.ru/scm/expert/outline-gate.git |
 | Ветка релиза | `master` + tags `v*` |
+| Deploy (RU) | [DEPLOY.ru.md](DEPLOY.ru.md) |
 
 ## 1. Что это
 
@@ -35,6 +39,8 @@
 ---
 
 ## 3. Получение кода
+
+Краткий сценарий «с нуля» — в **[DEPLOY.ru.md](DEPLOY.ru.md)**. Ниже — детали.
 
 ### 3.1. Релизный тег (рекомендуется)
 
@@ -75,18 +81,21 @@ cd outline-gate
 ```bash
 cd deploy/compose
 cp .env.example .env
-chmod +x configure.sh
+chmod +x configure.sh install.sh
 ./configure.sh
+./install.sh          # сборка + up + /readyz
 ```
 
-Скрипт спросит:
+`configure.sh` спросит:
 
-1. **Ключ Outline** — в `.env` (`OUTLINE_ACCESS_KEY`) или в `secrets/outline_key.txt`
-2. **ROUTING_MODE** — `exclude` / `include`
-3. При `include` — список `TUNNEL_CIDRS`
-4. Доп. `BYPASS_CIDRS` (опционально)
-5. **GATEWAY_ENABLE** — `false` для SOCKS, `true` для L3 host
-6. **LOG_LEVEL**
+1. **Профиль** — socks (bridge) / host (L3)
+2. **Ключ Outline** — в `.env` (`OUTLINE_ACCESS_KEY`) или в `secrets/outline_key.txt`
+3. **ROUTING_MODE** — `exclude` / `include`
+4. При `include` — список `TUNNEL_CIDRS`
+5. Доп. `BYPASS_CIDRS` (опционально)
+6. **UI_ENABLE** / **UI_TOKEN** (токен можно сгенерировать автоматически)
+7. Порты `HOST_*` (bridge) и опционально `SOCKS_ALLOW_CIDRS`
+8. **LOG_LEVEL**
 
 ### Ручная правка `.env`
 
@@ -97,10 +106,12 @@ OUTLINE_ACCESS_KEY=ss://....@server:port
 # Частые опции
 ROUTING_MODE=exclude
 GATEWAY_ENABLE=false
+COMPOSE_PROFILE=socks    # socks | host (для install.sh)
 HOST_SOCKS_PORT=1080
 HOST_HEALTH_PORT=28080   # health + Web UI на хосте
 UI_ENABLE=true
 UI_TOKEN=длинный-случайный-секрет
+# SOCKS_ALLOW_CIDRS=192.168.0.0/16,10.0.0.0/8,127.0.0.0/8
 LOG_LEVEL=info
 ```
 
@@ -168,18 +179,19 @@ docker run --rm -d --name outline-gate \
 
 ```bash
 cd deploy/compose
-# GATEWAY_ENABLE=false в .env
-docker compose up --build -d
+# GATEWAY_ENABLE=false, COMPOSE_PROFILE=socks в .env
+./install.sh
+# или: docker compose up --build -d
 docker compose ps
 docker compose logs -f
 ```
 
-Проверка:
+Проверка (порт health = `HOST_HEALTH_PORT`, по умолчанию в example — `28080`):
 
 ```bash
-curl -s http://127.0.0.1:8080/healthz    # ok
-curl -s http://127.0.0.1:8080/readyz     # {"ready":true,...}
-curl -s --socks5 127.0.0.1:1080 https://ifconfig.me
+curl -s http://127.0.0.1:28080/healthz    # ok
+curl -s http://127.0.0.1:28080/readyz     # {"ready":true,...}
+curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
 echo
 ```
 
@@ -192,11 +204,13 @@ IP в ответе должен совпадать с egress Outline-серве�
 ```bash
 cd deploy/compose
 # в .env:
+#   COMPOSE_PROFILE=host
 #   GATEWAY_ENABLE=true
 #   ROUTING_MODE=exclude   # или include + TUNNEL_CIDRS
 #   # LAN_INTERFACE=eth0   # при необходимости
 
-docker compose -f docker-compose.host.yml up --build -d
+./install.sh --host
+# или: docker compose -f docker-compose.host.yml up --build -d
 ```
 
 На клиенте (пример Linux):
@@ -253,6 +267,17 @@ sudo nft delete table inet outline_gate   # если осталась
 | `SOCKS_ALLOW_CIDRS_FILE` | нет | — | Файл CIDR source allowlist (по строке) |
 | `METRICS_ENABLE` | нет | `false` | Prometheus text на `http://<health>/metrics` (без auth) |
 | `HEALTH_LISTEN` | нет | `0.0.0.0:8080` | Health HTTP |
+| `TRANSPROXY_LISTEN` | нет | `127.0.0.1:12345` | REDIRECT target |
+| `LOG_LEVEL` | нет | `info` | debug/info/warn/error |
+| `LOG_FORMAT` | нет | `text` | text/json |
+| `RECONNECT_BASE_DELAY` | нет | `1s` | backoff |
+| `RECONNECT_MAX_DELAY` | нет | `60s` | cap backoff |
+| `HOST_SOCKS_PORT` | нет | `1080` | publish на хосте |
+| `HOST_HEALTH_PORT` | нет | `28080` (example) | publish health/UI на хосте |
+| `COMPOSE_PROFILE` | нет | `socks` | `socks` \| `host` — выбор файла для `install.sh` |
+| `IMAGE_TAG` | нет | `outline-gate:local` | тег образа |
+
+\* Нужен **хотя бы один** способ передать ключ.
 
 Включение metrics (bridge compose):
 
@@ -261,20 +286,10 @@ sudo nft delete table inet outline_gate   # если осталась
 METRICS_ENABLE=true
 # recreate
 docker compose up -d --force-recreate
-curl -s "http://127.0.0.1:${HOST_HEALTH_PORT:-8080}/metrics" | head
+curl -s "http://127.0.0.1:${HOST_HEALTH_PORT:-28080}/metrics" | head
 ```
-| `TRANSPROXY_LISTEN` | нет | `127.0.0.1:12345` | REDIRECT target |
-| `LOG_LEVEL` | нет | `info` | debug/info/warn/error |
-| `LOG_FORMAT` | нет | `text` | text/json |
-| `RECONNECT_BASE_DELAY` | нет | `1s` | backoff |
-| `RECONNECT_MAX_DELAY` | нет | `60s` | cap backoff |
-| `HOST_SOCKS_PORT` | нет | `1080` | publish на хосте |
-| `HOST_HEALTH_PORT` | нет | `8080` | publish на хосте |
-| `IMAGE_TAG` | нет | `outline-gate:local` | тег образа |
 
-\* Нужен **хотя бы один** способ передать ключ.
-
-Файлы списков: `deploy/compose/config/bypass.txt`, `bypass.rules.txt`, `tunnel.txt` (монтируются в `/config`, **rw** — UI пишет rules).
+Файлы списков: `deploy/compose/config/bypass.txt`, `bypass.rules.txt` (runtime, в gitignore; шаблон — `bypass.rules.example.txt`), `tunnel.txt` (монтируются в `/config`, **rw** — UI пишет rules).
 
 ### 7.1. Web UI (bypass + ключ Outline)
 
@@ -374,9 +389,10 @@ SIGHUP перечитывает env **процесса** (не обязател�
 
 ```bash
 cd outline-gate
-git pull
+git fetch --tags
+git checkout v0.4.0   # или: git pull
 cd deploy/compose
-docker compose up --build -d
+./install.sh
 ```
 
 ### 8.4. Бэкап конфигурации
@@ -384,8 +400,11 @@ docker compose up --build -d
 Сохраните (вне git, в секрет-хранилище):
 
 - `deploy/compose/.env`
-- `deploy/compose/secrets/outline_key.local.txt` (если используете)
-- `deploy/compose/config/*.txt`
+- `deploy/compose/secrets/outline_key.local.txt` / `outline_key.txt` (если используете)
+- `deploy/compose/config/bypass.rules.txt` и прочие `config/*.txt`
+- `deploy/compose/config/outline_key.runtime.txt` (ключ после UI)
+
+Перенос на другой хост — **шаг 9** в [DEPLOY.ru.md](DEPLOY.ru.md).
 
 ### 8.5. Безопасность
 
@@ -436,13 +455,18 @@ git remote add origin git@git.aservice24.ru:GROUP/outline-gate.git
 git push -u origin master
 ```
 
-3. На сервере развёртывания: clone → `configure.sh` → `docker compose up --build -d`.
-4. Убедиться, что `.env` и ключи **не** в репозитории (`git check-ignore -v deploy/compose/.env`).
+3. На сервере развёртывания: clone → `configure.sh` → `./install.sh` (см. [DEPLOY.ru.md](DEPLOY.ru.md)).
+4. Убедиться, что `.env`, ключи и runtime-rules **не** в репозитории:
+
+```bash
+git check-ignore -v deploy/compose/.env deploy/compose/config/bypass.rules.txt
+```
 
 ---
 
 ## 11. Связанные документы
 
+- [DEPLOY.ru.md](DEPLOY.ru.md) — **развёртывание на другом хосте (пошагово)**  
 - [architecture.md](architecture.md) — схема компонентов  
 - [deployment.md](deployment.md) — профили A/B/C (EN)  
 - [routing.md](routing.md) — режимы маршрутизации  

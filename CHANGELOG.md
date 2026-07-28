@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Published releases: https://github.com/unhexx/outline-gate/releases
 
+## [Unreleased]
+
+### Added
+
+- `docs/DEPLOY.ru.md` — пошаговое развёртывание на другом хосте
+- `deploy/compose/install.sh` — one-shot build/up/readyz (`--host`, `--socks`, `--down`, `--check`)
+- Makefile targets: `install`, `install-host`, `down`
+- Compose/env: явный проброс `SOCKS_ALLOW_CIDRS` / `SOCKS_ALLOW_CIDRS_FILE`
+
+### Changed
+
+- `configure.sh`: профиль socks|host, UI_TOKEN (автоген), порты, SOCKS allowlist; bootstrap `config/*`
+- `.env.example`: `HOST_HEALTH_PORT=28080` по умолчанию, комментарии allowlist / `COMPOSE_PROFILE`
+- Runtime `config/bypass.rules.txt` больше не в git (шаблон — `bypass.rules.example.txt`)
+
 ## [0.4.0] — 2026-07-27
 
 ### Added

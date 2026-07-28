@@ -1,6 +1,14 @@
 # Deployment
 
-**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md)
+**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md) · new-host steps (RU): [DEPLOY.ru.md](DEPLOY.ru.md)
+
+One-shot on a fresh host (after clone):
+
+```bash
+cd deploy/compose
+./configure.sh   # key + profile + UI token
+./install.sh     # build, up, wait for /readyz
+```
 
 ## Prerequisites
 
