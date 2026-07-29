@@ -1,13 +1,12 @@
 # Profile C: SOCKS (+ optional L3 on bridge; для LAN default-GW см. docker-compose.host.yml)
 #
-# Быстрый старт:
-#   cp .env.example .env && ./configure.sh
-#   docker compose up --build -d
+# Быстрый старт (из корня репозитория):
+#   ./install.sh 'ss://...'
 #
-# Ключ: OUTLINE_ACCESS_KEY в .env  ИЛИ  файл secrets/outline_key.txt
-#
-# Сеть: явный subnet (см. networks ниже), чтобы не зависеть от Docker
-# default-address-pools («all predefined address pools have been fully subnetted»).
+# Сеть: явный IPAM (не default-address-pools). Согласовано с типичным daemon.json:
+#   bip/fixed-cidr  = 192.168.100.0/24   (docker0)
+#   default-address-pools = 192.168.101.0/24  (прочие auto-сети)
+#   outline-gate_net      = 192.168.102.0/24  (эта сеть, вне пула)
 # Переопределение: COMPOSE_SUBNET / COMPOSE_GATEWAY в .env
 
 name: outline-gate
@@ -77,8 +76,8 @@ services:
       retries: 5
       start_period: 30s
 
-# Фиксированная user-defined сеть: IPAM не берётся из default-address-pools Docker.
-# Подсеть 10.247.71.0/24 — вне типичных LAN (192.168.x / 10.0.x) и /16-пулов 172.16/12.
+# Явный IPAM: не расходует default-address-pools (на узких пулах /24 — критично).
+# Не пересекается с bip 192.168.100.0/24 и auto-pool 192.168.101.0/24.
 networks:
   default:
     name: outline-gate_net
@@ -86,5 +85,5 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: ${COMPOSE_SUBNET:-10.247.71.0/24}
-          gateway: ${COMPOSE_GATEWAY:-10.247.71.1}
+        - subnet: ${COMPOSE_SUBNET:-192.168.102.0/24}
+          gateway: ${COMPOSE_GATEWAY:-192.168.102.1}

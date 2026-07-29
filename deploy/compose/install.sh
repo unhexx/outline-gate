@@ -1,18 +1,14 @@
 #!/usr/bin/env bash
-# Одношаговая установка / обновление outline-gate на текущем хосте.
+# Установка / обновление outline-gate (1–2 шага).
 #
-# Использование:
-#   cd deploy/compose
-#   ./configure.sh          # один раз: ключ и параметры
-#   ./install.sh            # сборка + запуск + проверка
+# Из корня репозитория или из deploy/compose:
+#   ./install.sh 'ss://...'                 # SOCKS (bridge) — неинтерактивно
+#   ./install.sh --host 'ssconf://...'      # L3 host network
+#   OUTLINE_ACCESS_KEY='ss://...' ./install.sh
+#   ./install.sh --configure                # интерактив (configure.sh)
 #
-# Флаги:
-#   --configure   запустить configure.sh перед up (интерактивно)
-#   --host        принудительно L3 host-профиль
-#   --socks       принудительно bridge SOCKS-профиль
-#   --no-build    не пересобирать образ
-#   --down        остановить и выйти
-#   --check       только health-check (без up)
+# Прочее:
+#   ./install.sh --down | --check | --no-build | --socks | --host
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -24,6 +20,7 @@ FORCE_PROFILE=""
 NO_BUILD=false
 DO_DOWN=false
 CHECK_ONLY=false
+CLI_KEY=""
 
 for a in "$@"; do
   case "$a" in
@@ -34,8 +31,11 @@ for a in "$@"; do
     --down) DO_DOWN=true ;;
     --check) CHECK_ONLY=true ;;
     -h|--help)
-      sed -n '2,20p' "$SELF"
+      sed -n '2,16p' "$SELF"
       exit 0
+      ;;
+    ss://*|ssconf://*)
+      CLI_KEY="$a"
       ;;
     *)
       echo "Неизвестный аргумент: $a (см. --help)" >&2
@@ -66,6 +66,67 @@ env_get() {
   fi
 }
 
+set_env() {
+  local key="$1" val="$2"
+  if [[ ! -f .env ]]; then
+    printf '%s=%s\n' "$key" "$val" > .env
+    chmod 600 .env || true
+    return
+  fi
+  if grep -qE "^${key}=" .env 2>/dev/null; then
+    local esc
+    esc=$(printf '%s' "$val" | sed 's/[&|\\]/\\&/g')
+    if sed --version >/dev/null 2>&1; then
+      sed -i -E "s|^${key}=.*|${key}=${esc}|" .env
+    else
+      sed -i '' -E "s|^${key}=.*|${key}=${esc}|" .env
+    fi
+  else
+    printf '%s=%s\n' "$key" "$val" >> .env
+  fi
+}
+
+ensure_env_file() {
+  if [[ -f .env ]]; then
+    return 0
+  fi
+  if [[ -f .env.example ]]; then
+    cp .env.example .env
+    chmod 600 .env || true
+    echo "Создан .env из .env.example"
+  else
+    touch .env
+    chmod 600 .env || true
+  fi
+}
+
+# Неинтерактивный bootstrap: ключ из argv / env → .env + дефолты сети под daemon.json.example
+bootstrap_from_key() {
+  local key="$1"
+  ensure_env_file
+  set_env OUTLINE_ACCESS_KEY "$key"
+
+  # Профиль
+  if [[ -n "$FORCE_PROFILE" ]]; then
+    set_env COMPOSE_PROFILE "$FORCE_PROFILE"
+  else
+    [[ -z "$(env_get COMPOSE_PROFILE)" ]] && set_env COMPOSE_PROFILE "socks"
+  fi
+  case "$(env_get COMPOSE_PROFILE socks)" in
+    host|HOST|l3|L3)
+      set_env GATEWAY_ENABLE "true"
+      ;;
+    *)
+      [[ -z "$(env_get GATEWAY_ENABLE)" ]] && set_env GATEWAY_ENABLE "false"
+      # Явный IPAM: bip 192.168.100/24, pool 192.168.101/24 → outline-gate 192.168.102/24
+      [[ -z "$(env_get COMPOSE_SUBNET)" ]] && set_env COMPOSE_SUBNET "192.168.102.0/24"
+      [[ -z "$(env_get COMPOSE_GATEWAY)" ]] && set_env COMPOSE_GATEWAY "192.168.102.1"
+      [[ -z "$(env_get HOST_SOCKS_PORT)" ]] && set_env HOST_SOCKS_PORT "1080"
+      [[ -z "$(env_get HOST_HEALTH_PORT)" ]] && set_env HOST_HEALTH_PORT "28080"
+      ;;
+  esac
+}
+
 ensure_config_files() {
   mkdir -p config secrets
   if [[ ! -f config/bypass.rules.txt ]]; then
@@ -77,7 +138,6 @@ ensure_config_files() {
   fi
   [[ -f config/bypass.txt ]] || { [[ -f config/bypass.example.txt ]] && cp config/bypass.example.txt config/bypass.txt || touch config/bypass.txt; }
   [[ -f config/tunnel.txt ]] || { [[ -f config/tunnel.example.txt ]] && cp config/tunnel.example.txt config/tunnel.txt || touch config/tunnel.txt; }
-  # stub key file so volume mount always succeeds
   if [[ ! -f secrets/outline_key.txt ]]; then
     printf '# unused when OUTLINE_ACCESS_KEY is set in .env\n' > secrets/outline_key.txt
     chmod 600 secrets/outline_key.txt || true
@@ -131,6 +191,28 @@ check_ready() {
   return 1
 }
 
+# --- network helpers: явная сеть, не зависит от default-address-pools ---
+ensure_bridge_network_defaults() {
+  local profile
+  profile="${FORCE_PROFILE:-$(env_get COMPOSE_PROFILE socks)}"
+  case "$profile" in
+    host|HOST|l3|L3|2) return 0 ;;
+  esac
+  ensure_env_file
+  [[ -z "$(env_get COMPOSE_SUBNET)" ]] && set_env COMPOSE_SUBNET "192.168.102.0/24"
+  [[ -z "$(env_get COMPOSE_GATEWAY)" ]] && set_env COMPOSE_GATEWAY "192.168.102.1"
+}
+
+compose_up() {
+  # shellcheck disable=SC2086
+  if $NO_BUILD; then
+    docker compose "$@" up -d
+  else
+    docker compose "$@" up --build -d
+  fi
+}
+
+# --- main ---
 CF="$(compose_files)"
 # shellcheck disable=SC2086
 set -- $CF
@@ -146,34 +228,45 @@ if $CHECK_ONLY; then
   exit $?
 fi
 
-if $DO_CONFIGURE || [[ ! -f .env ]]; then
+# Ключ: argv → env → .env / secrets
+if [[ -n "$CLI_KEY" ]]; then
+  bootstrap_from_key "$CLI_KEY"
+elif [[ -n "${OUTLINE_ACCESS_KEY:-}" ]]; then
+  bootstrap_from_key "$OUTLINE_ACCESS_KEY"
+elif $DO_CONFIGURE || [[ ! -f .env ]]; then
   if [[ ! -f .env ]]; then
     echo ".env отсутствует — запускаю configure.sh"
   fi
   if [[ -t 0 ]]; then
     chmod +x ./configure.sh
     ./configure.sh
-    # re-resolve profile after configure
     CF="$(compose_files)"
     # shellcheck disable=SC2086
     set -- $CF
   else
-    echo "Нет TTY и нет .env: скопируйте .env.example → .env и заполните OUTLINE_ACCESS_KEY" >&2
+    echo "Нет TTY и нет ключа." >&2
+    echo "  ./install.sh 'ss://...'   или   OUTLINE_ACCESS_KEY=ss://... ./install.sh" >&2
     exit 1
   fi
 fi
 
+ensure_bridge_network_defaults
 ensure_config_files
 
-# basic validation
+# re-resolve profile after env may have changed
+CF="$(compose_files)"
+# shellcheck disable=SC2086
+set -- $CF
+
 key="$(env_get OUTLINE_ACCESS_KEY)"
 key_file_host="$(env_get OUTLINE_KEY_HOST_PATH ./secrets/outline_key.txt)"
 if [[ -z "$key" ]]; then
   if [[ ! -f "$key_file_host" ]] || ! grep -vE '^[[:space:]]*(#|$)' "$key_file_host" | head -1 | grep -qE '^(ss|ssconf)://'; then
-    # also accept persist file written by UI
     if [[ ! -f config/outline_key.runtime.txt ]]; then
-      echo "Нет ключа Outline: задайте OUTLINE_ACCESS_KEY в .env или secrets/outline_key.txt" >&2
-      echo "  ./configure.sh" >&2
+      echo "Нет ключа Outline. Один из вариантов:" >&2
+      echo "  ./install.sh 'ss://...' " >&2
+      echo "  OUTLINE_ACCESS_KEY=ss://... ./install.sh" >&2
+      echo "  ./install.sh --configure" >&2
       exit 1
     fi
   fi
@@ -185,10 +278,17 @@ if [[ "$(env_get UI_ENABLE false)" == "true" && -z "$(env_get UI_TOKEN)" ]]; the
 fi
 
 echo "Профиль compose: docker compose $*"
-if $NO_BUILD; then
-  docker compose "$@" up -d
-else
-  docker compose "$@" up --build -d
+echo "Сеть (bridge): COMPOSE_SUBNET=$(env_get COMPOSE_SUBNET 192.168.102.0/24) GATEWAY=$(env_get COMPOSE_GATEWAY 192.168.102.1)"
+
+if ! compose_up "$@"; then
+  echo >&2
+  echo "Ошибка docker compose up." >&2
+  echo "Если «all predefined address pools have been fully subnetted»:" >&2
+  echo "  — bridge-профиль уже использует явный COMPOSE_SUBNET (не пул Docker);" >&2
+  echo "  — проверьте .env: COMPOSE_SUBNET/COMPOSE_GATEWAY не пересекаются с bip/LAN;" >&2
+  echo "  — пример daemon: deploy/docker/daemon.json.example" >&2
+  echo "  — или: docker network prune  (удалит неиспользуемые сети)" >&2
+  exit 1
 fi
 
 docker compose "$@" ps
@@ -197,7 +297,7 @@ check_ready || true
 hp="$(health_port)"
 sp="$(socks_port)"
 echo
-echo "=== Дальше ==="
+echo "=== Готово ==="
 echo "  Health:  curl -s http://127.0.0.1:${hp}/readyz"
 echo "  SOCKS:   curl -s --socks5h 127.0.0.1:${sp} https://ifconfig.me"
 if [[ "$(env_get UI_ENABLE false)" == "true" ]]; then
@@ -206,4 +306,4 @@ fi
 echo "  Logs:    docker compose $* logs -f --tail=100"
 echo "  Stop:    ./install.sh --down"
 echo
-echo "Полная инструкция: docs/DEPLOY.ru.md"
+echo "Подробнее: docs/DEPLOY.ru.md"

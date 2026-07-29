@@ -1,180 +1,136 @@
 # Развёртывание outline-gate на другом хосте
 
-**Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · подробная эксплуатация: [OPERATIONS.ru.md](OPERATIONS.ru.md)
-
-Краткая пошаговая инструкция: от пустого Linux-хоста до рабочего SOCKS / L3-шлюза.
+**Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · эксплуатация: [OPERATIONS.ru.md](OPERATIONS.ru.md)
 
 | Ресурс | URL |
 |--------|-----|
 | GitHub | https://github.com/unhexx/outline-gate |
 | Internal (aservice) | https://git.aservice24.ru/scm/expert/outline-gate.git |
-| Релизный тег | `v0.4.0` (ветка `master`) |
+| Ветка | `main` / `master` |
+
+---
+
+## Быстрая установка (2 шага)
+
+Требуется: Docker Engine + Compose v2, ключ Outline (`ss://` или `ssconf://`).
+
+```bash
+# 1) код
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
+
+# 2) запуск (создаст .env, сеть 192.168.102.0/24, build+up, /readyz)
+./install.sh 'ss://YOUR_KEY_HERE'
+```
+
+Проверка:
+
+```bash
+curl -s http://127.0.0.1:28080/readyz
+curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
+```
+
+L3-шлюз (host network):
+
+```bash
+./install.sh --host 'ss://YOUR_KEY_HERE'
+```
+
+Обновление на уже установленном хосте:
+
+```bash
+git pull
+./install.sh                  # ключ уже в deploy/compose/.env
+# или: ./install.sh --no-build
+```
+
+---
+
+## Docker daemon на хосте (рекомендуется)
+
+На узлах с **узким** `default-address-pools` (один `/24`) auto-сети Docker быстро заканчиваются
+(`all predefined address pools have been fully subnetted`).
+
+Рекомендуемый `/etc/docker/daemon.json` (см. `deploy/docker/daemon.json.example`):
+
+```json
+{
+  "bip": "192.168.100.1/24",
+  "fixed-cidr": "192.168.100.0/24",
+  "default-address-pools": [
+    { "base": "192.168.101.0/24", "size": 24 }
+  ]
+}
+```
+
+| Диапазон | Назначение |
+|----------|------------|
+| `192.168.100.0/24` | docker0 (`bip` / `fixed-cidr`) |
+| `192.168.101.0/24` | auto-сети других compose-проектов |
+| `192.168.102.0/24` | **outline-gate** — явный IPAM в `docker-compose.yml` (не берёт из pool) |
+
+После правки daemon: `sudo systemctl restart docker`.
+
+Переопределение подсети outline-gate: `COMPOSE_SUBNET` / `COMPOSE_GATEWAY` в `deploy/compose/.env`.
 
 ---
 
 ## Что получите
 
-На целевом хосте:
+1. Контейнер **outline-gate** (`ss://` / `ssconf://`).
+2. **SOCKS5** на `:1080` (bridge) или host network.
+3. Опционально **L3-шлюз** (`./install.sh --host`).
+4. Опционально **Web UI** — после install: `UI_ENABLE=true` + `UI_TOKEN` в `.env`, затем `./install.sh --no-build`.
 
-1. Контейнер **outline-gate** с клиентом Outline (`ss://` / `ssconf://`).
-2. **SOCKS5** на порту хоста (по умолчанию `1080`).
-3. Опционально **L3-шлюз** (клиенты LAN → IP хоста как default gateway).
-4. Опционально **Web UI** для bypass-списка и смены ключа.
-
-Секреты (ключ Outline, `UI_TOKEN`, `.env`) **не** хранятся в git — настраиваются только на хосте.
+Секреты **не** в git.
 
 ---
 
-## Шаг 0. Требования на целевом хосте
+## Требования
 
 | Требование | Минимум |
 |------------|---------|
-| ОС | Linux x86_64 (Docker; для L3 — nftables / `NET_ADMIN`) |
-| Docker | Engine 20+ и **Compose v2** (`docker compose version`) |
-| Порты | свободны `1080` (SOCKS) и health/UI (часто `28080` или `8080`) |
-| Ключ | Outline access key: `ss://...` или `ssconf://...` |
-| Сеть | доступ хоста до Outline-сервера (UDP/TCP по ключу) |
-
-Проверка:
+| ОС | Linux x86_64 |
+| Docker | Engine 20+ + **Compose v2** |
+| Порты | `1080` (SOCKS), `28080` (health; host-профиль — `8080`) |
+| Ключ | `ss://...` или `ssconf://...` |
 
 ```bash
-docker --version
-docker compose version
-curl -fsSL https://get.docker.com | sh   # если Docker ещё нет (официальный install)
+docker --version && docker compose version
 ```
-
-Пользователь деплоя должен быть в группе `docker` (или запускать через root).
 
 ---
 
-## Шаг 1. Получить код
+## Профили
 
-### Вариант A — релизный тег (рекомендуется)
-
-```bash
-# GitHub
-git clone https://github.com/unhexx/outline-gate.git
-cd outline-gate
-git checkout v0.4.0
-
-# или internal aservice
-git clone https://git.aservice24.ru/scm/expert/outline-gate.git
-cd outline-gate
-git checkout v0.4.0
-```
-
-### Вариант B — актуальный master
-
-```bash
-git clone https://github.com/unhexx/outline-gate.git
-cd outline-gate
-# git pull  # при обновлении существующей копии
-```
-
-### Вариант C — только бинарник (без Docker)
-
-```bash
-curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
-chmod +x outline-gate
-export OUTLINE_ACCESS_KEY='ss://...'
-./outline-gate
-```
-
-Для production предпочтителен Docker (шаги ниже).
+| Профиль | Compose | Команда |
+|---------|---------|---------|
+| **socks** (bridge) | `docker-compose.yml` | `./install.sh 'ss://...'` |
+| **host** (L3) | `docker-compose.host.yml` | `./install.sh --host 'ss://...'` |
 
 ---
 
-## Шаг 2. Выбрать профиль
-
-| Профиль | Compose-файл | Когда |
-|---------|--------------|--------|
-| **socks** (bridge) | `docker-compose.yml` | Приложения указывают SOCKS5 `HOST:1080`. Без смены gateway. |
-| **host** (L3) | `docker-compose.host.yml` | Хост = default GW для LAN; TV/IoT без proxy. |
-
-Можно использовать **оба**: L3 для устройств + SOCKS для приложений на том же хосте (host-профиль слушает `:1080` на всех интерфейсах).
-
----
-
-## Шаг 3. Настроить секреты и параметры
+## Интерактив / ручная настройка
 
 ```bash
-cd deploy/compose
-chmod +x configure.sh install.sh
-./configure.sh
+./install.sh --configure          # wizard → .env → up
+# или
+cd deploy/compose && cp .env.example .env && $EDITOR .env && ./install.sh
 ```
 
-Скрипт создаст `.env` и спросит:
-
-1. **Профиль** — socks или host (L3)
-2. **Ключ Outline** — в `.env` или в `secrets/outline_key.txt`
-3. **ROUTING_MODE** — `exclude` (всё в VPN кроме bypass) / `include`
-4. **Web UI** — `UI_ENABLE`, автогенерация `UI_TOKEN`
-5. **Порты** хоста (для socks) и опционально `SOCKS_ALLOW_CIDRS`
-
-### Без интерактива
-
-```bash
-cd deploy/compose
-cp .env.example .env
-# отредактируйте:
-#   OUTLINE_ACCESS_KEY=ss://...@server:port
-#   UI_ENABLE=true
-#   UI_TOKEN=$(openssl rand -hex 24)
-#   HOST_HEALTH_PORT=28080
-#   COMPOSE_PROFILE=socks   # или host
-#   GATEWAY_ENABLE=false    # true для L3
-nano .env
-```
-
-Файлы runtime (не в git):
+Файлы runtime:
 
 | Путь | Назначение |
 |------|------------|
-| `deploy/compose/.env` | переменные окружения |
-| `secrets/outline_key.txt` | опционально ключ вместо env |
-| `config/bypass.rules.txt` | правила UI (создаётся из example при install) |
-| `config/outline_key.runtime.txt` | ключ после замены в Web UI |
+| `deploy/compose/.env` | env (ключ, порты, `COMPOSE_SUBNET`) |
+| `secrets/outline_key.txt` | опционально ключ-файл |
+| `config/bypass.rules.txt` | правила UI |
+| `config/outline_key.runtime.txt` | ключ после замены в UI |
 
----
-
-## Шаг 4. Собрать и запустить
-
-Одной командой:
+Флаги:
 
 ```bash
-cd deploy/compose
-./install.sh
-```
-
-Скрипт:
-
-- проверит Docker / Compose;
-- при отсутствии `.env` предложит `configure.sh`;
-- подготовит `config/*` и stub для secrets;
-- выполнит `docker compose up --build -d` для выбранного профиля;
-- дождётся `GET /readyz`.
-
-### Вручную
-
-```bash
-# SOCKS (bridge)
-docker compose -f docker-compose.yml up --build -d
-
-# L3 (host network)
-# в .env: GATEWAY_ENABLE=true  COMPOSE_PROFILE=host
-docker compose -f docker-compose.host.yml up --build -d
-```
-
-Полезные флаги `install.sh`:
-
-```bash
-./install.sh --configure   # настройка + запуск
-./install.sh --host        # принудительно L3
-./install.sh --socks       # принудительно SOCKS
-./install.sh --check       # только /readyz
-./install.sh --down        # остановка
-./install.sh --no-build    # up без rebuild
+./install.sh --configure | --host | --socks | --check | --down | --no-build
 ```
 
 ---
@@ -312,20 +268,18 @@ sudo nft delete table inet outline_gate
 | SOCKS timeout | firewall, allowlist, жив ли Outline server |
 | L3 «не работает» | host-compose? `GATEWAY_ENABLE=true`? GW на клиентах = IP хоста? |
 | Порт занят | смените `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` в `.env` |
-| `all predefined address pools have been fully subnetted` | в bridge-compose уже задан явный `COMPOSE_SUBNET` (сеть `outline-gate_net`). При конфликте подсети смените `COMPOSE_SUBNET`/`COMPOSE_GATEWAY` в `.env`, либо освободите пулы: `docker network prune`. Host-профиль (`docker-compose.host.yml`) сети bridge не создаёт. |
+| `all predefined address pools have been fully subnetted` | outline-gate **не** использует pool: сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM). Обновите код (`git pull`) и `./install.sh`. Конфликт подсети → смените `COMPOSE_SUBNET`/`COMPOSE_GATEWAY`. Рекомендуемый daemon: `deploy/docker/daemon.json.example`. Host-профиль bridge не создаёт. |
 | Permission denied на `config/*` | файлы от root из контейнера: `docker run --rm -v $PWD/config:/c alpine chown -R $(id -u):$(id -g) /c` |
 
 ---
 
-## Чеклист «новый хост за 10 минут»
+## Чеклист «новый хост»
 
-- [ ] Docker + Compose v2
-- [ ] `git clone` + `git checkout v0.4.0`
-- [ ] `cd deploy/compose && ./configure.sh`
-- [ ] `./install.sh`
+- [ ] Docker + Compose v2 (опц. `daemon.json` из `deploy/docker/daemon.json.example`)
+- [ ] `git clone` + `./install.sh 'ss://...'`
 - [ ] `curl` `/readyz` + SOCKS `ifconfig.me`
 - [ ] Firewall: только LAN на 1080/UI
-- [ ] (опц.) клиенты: SOCKS или default GW
+- [ ] (опц.) `./install.sh --host` для L3
 - [ ] (опц.) бэкап `.env` + `config/bypass.rules.txt`
 
 ---

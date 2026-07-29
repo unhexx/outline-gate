@@ -92,26 +92,25 @@
 
 ## Быстрый старт
 
-Пошагово на **другом / новом хосте**: **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)**.
+Подробно: **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)**.
 
 ```bash
-cd deploy/compose
-chmod +x configure.sh install.sh
-./configure.sh          # ключ Outline, профиль socks|host, UI_TOKEN
-./install.sh            # build + up + ожидание /readyz
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
+./install.sh 'ss://YOUR_OUTLINE_KEY'
 
 curl -s http://127.0.0.1:28080/readyz
-# UI: http://127.0.0.1:28080/ui/
 curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
 ```
 
-L3-шлюз (host network, клиенты LAN → IP хоста как default GW):
+L3-шлюз (host network):
 
 ```bash
-# в .env: COMPOSE_PROFILE=host  GATEWAY_ENABLE=true
-./install.sh --host
-# или: docker compose -f docker-compose.host.yml up --build -d
+./install.sh --host 'ss://YOUR_OUTLINE_KEY'
 ```
+
+Bridge-сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM; не расходует Docker `default-address-pools`).  
+Пример daemon: [`deploy/docker/daemon.json.example`](deploy/docker/daemon.json.example).
 
 ---
 
@@ -130,11 +129,7 @@ L3-шлюз (host network, клиенты LAN → IP хоста как default G
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
-cd deploy/compose
-cp .env.example .env
-# OUTLINE_ACCESS_KEY=...  UI_ENABLE=true  UI_TOKEN=...
-docker compose up --build -d
+./install.sh 'ss://...'          # или: git checkout v0.4.0 && ./install.sh 'ss://...'
 ```
 
 Образ с меткой релиза:
