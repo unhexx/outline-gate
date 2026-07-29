@@ -2,13 +2,13 @@
 # Установка / обновление outline-gate (1–2 шага).
 #
 # Из корня репозитория или из deploy/compose:
-#   ./install.sh 'ss://...'                 # SOCKS (bridge) — неинтерактивно
-#   ./install.sh --host 'ssconf://...'      # L3 host network
-#   OUTLINE_ACCESS_KEY='ss://...' ./install.sh
-#   ./install.sh --configure                # интерактив (configure.sh)
+#   bash install.sh 'ss://...'              # SOCKS (bridge); без +x / noexec OK
+#   bash install.sh --host 'ssconf://...'
+#   OUTLINE_ACCESS_KEY='ss://...' bash install.sh
+#   bash install.sh --configure             # интерактив (configure.sh)
 #
 # Прочее:
-#   ./install.sh --down | --check | --no-build | --socks | --host
+#   bash install.sh --down | --check | --no-build | --socks | --host
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -238,14 +238,14 @@ elif $DO_CONFIGURE || [[ ! -f .env ]]; then
     echo ".env отсутствует — запускаю configure.sh"
   fi
   if [[ -t 0 ]]; then
-    chmod +x ./configure.sh
-    ./configure.sh
+    # bash, не ./ — не требует +x / noexec
+    bash ./configure.sh
     CF="$(compose_files)"
     # shellcheck disable=SC2086
     set -- $CF
   else
     echo "Нет TTY и нет ключа." >&2
-    echo "  ./install.sh 'ss://...'   или   OUTLINE_ACCESS_KEY=ss://... ./install.sh" >&2
+    echo "  bash install.sh 'ss://...'   или   OUTLINE_ACCESS_KEY=ss://... bash install.sh" >&2
     exit 1
   fi
 fi
@@ -264,9 +264,9 @@ if [[ -z "$key" ]]; then
   if [[ ! -f "$key_file_host" ]] || ! grep -vE '^[[:space:]]*(#|$)' "$key_file_host" | head -1 | grep -qE '^(ss|ssconf)://'; then
     if [[ ! -f config/outline_key.runtime.txt ]]; then
       echo "Нет ключа Outline. Один из вариантов:" >&2
-      echo "  ./install.sh 'ss://...' " >&2
-      echo "  OUTLINE_ACCESS_KEY=ss://... ./install.sh" >&2
-      echo "  ./install.sh --configure" >&2
+      echo "  bash install.sh 'ss://...'" >&2
+      echo "  OUTLINE_ACCESS_KEY=ss://... bash install.sh" >&2
+      echo "  bash install.sh --configure" >&2
       exit 1
     fi
   fi
@@ -304,6 +304,6 @@ if [[ "$(env_get UI_ENABLE false)" == "true" ]]; then
   echo "  Web UI:  http://127.0.0.1:${hp}/ui/"
 fi
 echo "  Logs:    docker compose $* logs -f --tail=100"
-echo "  Stop:    ./install.sh --down"
+echo "  Stop:    bash install.sh --down"
 echo
 echo "Подробнее: docs/DEPLOY.ru.md"
