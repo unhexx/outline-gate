@@ -73,6 +73,8 @@ Attach the service to `lan` with a static IP, set `GATEWAY_ENABLE=true`, point c
 Default `docker-compose.yml`: `GATEWAY_ENABLE=false`, publish `1080` / health (`HOST_HEALTH_PORT` → container `8080`).  
 Apps configure SOCKS5 to `host:1080`. No default-gateway change required.
 
+The compose file defines a fixed bridge network `outline-gate_net` with explicit IPAM (`COMPOSE_SUBNET` default `10.247.71.0/24`) so Docker does not allocate from `default-address-pools` (avoids `all predefined address pools have been fully subnetted` on busy hosts). Override `COMPOSE_SUBNET` / `COMPOSE_GATEWAY` in `.env` if that range collides.
+
 ```bash
 cd deploy/compose
 cp .env.example .env

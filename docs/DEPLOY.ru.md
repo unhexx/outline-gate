@@ -312,6 +312,7 @@ sudo nft delete table inet outline_gate
 | SOCKS timeout | firewall, allowlist, жив ли Outline server |
 | L3 «не работает» | host-compose? `GATEWAY_ENABLE=true`? GW на клиентах = IP хоста? |
 | Порт занят | смените `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` в `.env` |
+| `all predefined address pools have been fully subnetted` | в bridge-compose уже задан явный `COMPOSE_SUBNET` (сеть `outline-gate_net`). При конфликте подсети смените `COMPOSE_SUBNET`/`COMPOSE_GATEWAY` в `.env`, либо освободите пулы: `docker network prune`. Host-профиль (`docker-compose.host.yml`) сети bridge не создаёт. |
 | Permission denied на `config/*` | файлы от root из контейнера: `docker run --rm -v $PWD/config:/c alpine chown -R $(id -u):$(id -g) /c` |
 
 ---

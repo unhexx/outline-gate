@@ -5,6 +5,10 @@
 #   docker compose up --build -d
 #
 # Ключ: OUTLINE_ACCESS_KEY в .env  ИЛИ  файл secrets/outline_key.txt
+#
+# Сеть: явный subnet (см. networks ниже), чтобы не зависеть от Docker
+# default-address-pools («all predefined address pools have been fully subnetted»).
+# Переопределение: COMPOSE_SUBNET / COMPOSE_GATEWAY в .env
 
 name: outline-gate
 
@@ -19,6 +23,8 @@ services:
       - NET_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
+    networks:
+      - default
     env_file:
       - path: .env
         required: false
@@ -70,3 +76,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+# Фиксированная user-defined сеть: IPAM не берётся из default-address-pools Docker.
+# Подсеть 10.247.71.0/24 — вне типичных LAN (192.168.x / 10.0.x) и /16-пулов 172.16/12.
+networks:
+  default:
+    name: outline-gate_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${COMPOSE_SUBNET:-10.247.71.0/24}
+          gateway: ${COMPOSE_GATEWAY:-10.247.71.1}
