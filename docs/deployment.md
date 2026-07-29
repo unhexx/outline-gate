@@ -1,6 +1,14 @@
 # Deployment
 
-**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md)
+**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md) · new-host steps (RU): [DEPLOY.ru.md](DEPLOY.ru.md)
+
+One-shot on a fresh host (after clone):
+
+```bash
+cd deploy/compose
+./configure.sh   # key + profile + UI token
+./install.sh     # build, up, wait for /readyz
+```
 
 ## Prerequisites
 
@@ -65,11 +73,17 @@ Attach the service to `lan` with a static IP, set `GATEWAY_ENABLE=true`, point c
 Default `docker-compose.yml`: `GATEWAY_ENABLE=false`, publish `1080` / health (`HOST_HEALTH_PORT` → container `8080`).  
 Apps configure SOCKS5 to `host:1080`. No default-gateway change required.
 
+Bridge network `outline-gate_net` uses **explicit IPAM** (`COMPOSE_SUBNET` default `192.168.102.0/24`) so Docker does not allocate from `default-address-pools`. This matches the recommended host daemon layout in `deploy/docker/daemon.json.example`:
+
+| Range | Role |
+|-------|------|
+| `192.168.100.0/24` | docker0 (`bip` / `fixed-cidr`) |
+| `192.168.101.0/24` | auto networks (other compose projects) |
+| `192.168.102.0/24` | outline-gate (this compose file) |
+
 ```bash
-cd deploy/compose
-cp .env.example .env
-# OUTLINE_ACCESS_KEY, UI_ENABLE, UI_TOKEN, HOST_HEALTH_PORT=28080
-docker compose up --build -d
+# from repo root
+./install.sh 'ss://...'
 curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
 curl -s http://127.0.0.1:28080/readyz
 ```

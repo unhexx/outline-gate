@@ -46,6 +46,9 @@ services:
       OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
       # Prometheus text exposition on HEALTH_LISTEN (/metrics). Off by default.
       METRICS_ENABLE: ${METRICS_ENABLE:-false}
+      # Optional SOCKS source allowlist (CSV / file). Empty = accept all.
+      SOCKS_ALLOW_CIDRS: ${SOCKS_ALLOW_CIDRS:-}
+      SOCKS_ALLOW_CIDRS_FILE: ${SOCKS_ALLOW_CIDRS_FILE:-}
     volumes:
       - ./config:/config
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro

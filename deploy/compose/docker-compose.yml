@@ -1,10 +1,13 @@
 # Profile C: SOCKS (+ optional L3 on bridge; для LAN default-GW см. docker-compose.host.yml)
 #
-# Быстрый старт:
-#   cp .env.example .env && ./configure.sh
-#   docker compose up --build -d
+# Быстрый старт (из корня репозитория):
+#   ./install.sh 'ss://...'
 #
-# Ключ: OUTLINE_ACCESS_KEY в .env  ИЛИ  файл secrets/outline_key.txt
+# Сеть: явный IPAM (не default-address-pools). Согласовано с типичным daemon.json:
+#   bip/fixed-cidr  = 192.168.100.0/24   (docker0)
+#   default-address-pools = 192.168.101.0/24  (прочие auto-сети)
+#   outline-gate_net      = 192.168.102.0/24  (эта сеть, вне пула)
+# Переопределение: COMPOSE_SUBNET / COMPOSE_GATEWAY в .env
 
 name: outline-gate
 
@@ -19,6 +22,8 @@ services:
       - NET_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
+    networks:
+      - default
     env_file:
       - path: .env
         required: false
@@ -51,6 +56,9 @@ services:
       OUTLINE_KEY_PERSIST_FILE: ${OUTLINE_KEY_PERSIST_FILE:-/config/outline_key.runtime.txt}
       # Prometheus text exposition on HEALTH_LISTEN (/metrics). Off by default.
       METRICS_ENABLE: ${METRICS_ENABLE:-false}
+      # Optional SOCKS source allowlist (CSV / file). Empty = accept all.
+      SOCKS_ALLOW_CIDRS: ${SOCKS_ALLOW_CIDRS:-}
+      SOCKS_ALLOW_CIDRS_FILE: ${SOCKS_ALLOW_CIDRS_FILE:-}
     volumes:
       # rw: UI/API пишет bypass.rules.txt; static CIDR-файлы тоже здесь
       - ./config:/config
@@ -67,3 +75,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+# Явный IPAM: не расходует default-address-pools (на узких пулах /24 — критично).
+# Не пересекается с bip 192.168.100.0/24 и auto-pool 192.168.101.0/24.
+networks:
+  default:
+    name: outline-gate_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${COMPOSE_SUBNET:-192.168.102.0/24}
+          gateway: ${COMPOSE_GATEWAY:-192.168.102.1}

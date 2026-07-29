@@ -92,31 +92,25 @@
 
 ## Быстрый старт
 
+Подробно: **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)**.
+
 ```bash
-cd deploy/compose
-cp .env.example .env
-chmod +x configure.sh
-./configure.sh          # ввод ss:// ключа и параметров
-
-# Web UI (рекомендуется для LAN)
-# в .env:
-#   UI_ENABLE=true
-#   UI_TOKEN=<длинный-секрет>
-#   HOST_HEALTH_PORT=28080
-
-docker compose up --build -d
+git clone https://github.com/unhexx/outline-gate.git
+cd outline-gate
+./install.sh 'ss://YOUR_OUTLINE_KEY'
 
 curl -s http://127.0.0.1:28080/readyz
-# UI: http://127.0.0.1:28080/ui/
 curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
 ```
 
-L3-шлюз (host network, клиенты LAN → IP хоста как default GW):
+L3-шлюз (host network):
 
 ```bash
-# в .env: GATEWAY_ENABLE=true
-docker compose -f docker-compose.host.yml up --build -d
+./install.sh --host 'ss://YOUR_OUTLINE_KEY'
 ```
+
+Bridge-сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM; не расходует Docker `default-address-pools`).  
+Пример daemon: [`deploy/docker/daemon.json.example`](deploy/docker/daemon.json.example).
 
 ---
 
@@ -135,11 +129,7 @@ docker compose -f docker-compose.host.yml up --build -d
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
-cd deploy/compose
-cp .env.example .env
-# OUTLINE_ACCESS_KEY=...  UI_ENABLE=true  UI_TOKEN=...
-docker compose up --build -d
+./install.sh 'ss://...'          # или: git checkout v0.4.0 && ./install.sh 'ss://...'
 ```
 
 Образ с меткой релиза:
@@ -630,7 +620,8 @@ docker run --rm -d --name outline-gate \
 
 | Документ | Содержание |
 |----------|------------|
-| **[docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md)** | Пошаговое развёртывание и эксплуатация (RU) |
+| **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)** | Развёртывание на другом хосте (пошагово, RU) |
+| **[docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md)** | Полный справочник развёртывания и эксплуатации (RU) |
 | [docs/architecture.md](docs/architecture.md) | Архитектура компонентов |
 | [docs/deployment.md](docs/deployment.md) | Профили сети A/B/C |
 | [docs/routing.md](docs/routing.md) | Режимы маршрутизации и bypass |
