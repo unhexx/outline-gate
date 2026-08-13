@@ -9,8 +9,17 @@ import (
 
 // tokenAuth middleware requires Bearer token or HTTP Basic password == token.
 func tokenAuth(token string, next http.Handler) http.Handler {
+	return tokenAuthOpts(token, next, false)
+}
+
+// tokenAuthSSE is tokenAuth plus ?token= (EventSource cannot set Authorization).
+func tokenAuthSSE(token string, next http.Handler) http.Handler {
+	return tokenAuthOpts(token, next, true)
+}
+
+func tokenAuthOpts(token string, next http.Handler, allowQuery bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token == "" || !checkToken(r, token) {
+		if token == "" || !checkToken(r, token, allowQuery) {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="outline-gate", Basic realm="outline-gate"`)
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
@@ -19,7 +28,7 @@ func tokenAuth(token string, next http.Handler) http.Handler {
 	})
 }
 
-func checkToken(r *http.Request, want string) bool {
+func checkToken(r *http.Request, want string, allowQuery bool) bool {
 	auth := r.Header.Get("Authorization")
 	if auth != "" {
 		const bearer = "Bearer "
@@ -41,9 +50,11 @@ func checkToken(r *http.Request, want string) bool {
 			return subtle.ConstantTimeCompare([]byte(parts[1]), []byte(want)) == 1
 		}
 	}
-	// EventSource cannot set Authorization; allow ?token= for SSE streams only.
-	if q := r.URL.Query().Get("token"); q != "" {
-		return subtle.ConstantTimeCompare([]byte(q), []byte(want)) == 1
+	// EventSource cannot set Authorization; ?token= only on SSE (see tokenAuthSSE).
+	if allowQuery {
+		if q := r.URL.Query().Get("token"); q != "" {
+			return subtle.ConstantTimeCompare([]byte(q), []byte(want)) == 1
+		}
 	}
 	return false
 }

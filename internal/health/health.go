@@ -52,6 +52,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	tunnelOK := s.TunnelReady == nil || s.TunnelReady()
 	gwOK := !s.GatewayRequired || s.GatewayReady == nil || s.GatewayReady()
 	if !tunnelOK || !gwOK {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ready":   false,
