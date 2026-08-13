@@ -43,6 +43,18 @@ func TestManagerEffectiveAndMatch(t *testing.T) {
 	if !m.MatchIP(net.ParseIP("93.184.216.34")) {
 		t.Fatal("resolved IP should match for SOCKS")
 	}
+	if !m.ShouldBypassHost("192.168.10.5") {
+		t.Fatal("static RFC1918 CIDR must bypass SOCKS IP targets")
+	}
+	if !m.MatchIP(net.ParseIP("192.168.10.5")) {
+		t.Fatal("static CIDR MatchIP")
+	}
+	if ok, rule := m.MatchBypass("192.168.10.5"); !ok || rule != "static" {
+		t.Fatalf("static rule label: ok=%v rule=%q", ok, rule)
+	}
+	if m.ShouldBypassHost("8.8.8.8") {
+		t.Fatal("public IP must not match static-only bypass")
+	}
 
 	eff := m.EffectiveBypassNets()
 	if !containsNet(eff, "192.168.0.0/16") || !containsNet(eff, "10.0.0.0/8") || !containsNet(eff, "93.184.216.34/32") {

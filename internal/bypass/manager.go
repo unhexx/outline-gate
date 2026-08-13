@@ -31,12 +31,12 @@ type Manager struct {
 
 // Options configures a Manager.
 type Options struct {
-	Store         *Store
-	StaticBypass  []net.IPNet
-	LookupIP      LookupIPFunc
-	Logger        *slog.Logger
-	RefreshEvery  time.Duration
-	OnChange      OnChangeFunc
+	Store        *Store
+	StaticBypass []net.IPNet
+	LookupIP     LookupIPFunc
+	Logger       *slog.Logger
+	RefreshEvery time.Duration
+	OnChange     OnChangeFunc
 }
 
 // NewManager creates a Manager. Call Refresh after Load.
@@ -141,8 +141,8 @@ func (m *Manager) MatchHost(host string) bool {
 	return ok
 }
 
-// MatchIP reports whether IP matches user IP/CIDR rules (not resolved domain IPs).
-// For SOCKS with IP target, also check EffectiveBypassNets via routing engine.
+// MatchIP reports whether IP should skip the tunnel: user IP/CIDR rules,
+// static bypass (RFC1918 / BYPASS_CIDRS), or DNS-resolved domain IPs.
 func (m *Manager) MatchIP(ip net.IP) bool {
 	ok, _ := m.matchIPDetail(ip)
 	return ok
@@ -168,13 +168,26 @@ func (m *Manager) MatchBypass(host string) (bool, string) {
 }
 
 func (m *Manager) matchIPDetail(ip net.IP) (bool, string) {
+	if ip == nil {
+		return false, ""
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
 	m.mu.RLock()
 	matcher := m.matcher
 	resolved := m.resolved
+	static := m.static
 	m.mu.RUnlock()
 	if matcher != nil {
 		if ok, rule := matcher.MatchIPDetail(ip); ok {
 			return true, rule
+		}
+	}
+	// Always-bypass private/reserved + BYPASS_CIDRS (SOCKS IP CONNECT).
+	for i := range static {
+		if static[i].Contains(ip) {
+			return true, "static"
 		}
 	}
 	// Also treat resolved domain IPs as bypass for SOCKS IP connect.
