@@ -9,6 +9,7 @@ Regardless of mode, the following never go through the tunnel:
 - Default private/reserved ranges (RFC1918, CGNAT `100.64.0.0/10`, link-local, loopback, multicast, …)
 - Extra `BYPASS_CIDRS` / file
 - User rules from `BYPASS_RULES_FILE` / Web UI (`/ui/`): IP, CIDR, domains, `*.suffix`
+  - Default template includes: `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`
 - Resolved Outline server IPv4 (auto)
 
 This prevents blackhole loops when the tunnel itself would encapsulate traffic to the proxy server.

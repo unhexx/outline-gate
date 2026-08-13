@@ -292,6 +292,30 @@ docker run --rm curlimages/curl:latest \
 # BYPASS_RULES_FILE=/config/bypass.rules.txt  →  example.com
 ```
 
+**Предустановленные маски** (шаблон → `config/bypass.rules.txt`):  
+`*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`.
+
+**Простые команды** (нужны `UI_ENABLE=true` + `UI_TOKEN`; порт = `HOST_HEALTH_PORT`):
+
+```bash
+PORT=28080
+AUTH=(-H "Authorization: Bearer $UI_TOKEN")
+
+# список
+curl -s "${AUTH[@]}" "http://127.0.0.1:${PORT}/api/v1/bypass"
+
+# добавить
+curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"*.example.com"}' "http://127.0.0.1:${PORT}/api/v1/bypass"
+
+# удалить
+curl -s -X DELETE "${AUTH[@]}" \
+  "http://127.0.0.1:${PORT}/api/v1/bypass?rule=*.example.com"
+```
+
+Без UI: правка `deploy/compose/config/bypass.rules.txt` + `docker kill -s HUP outline-gate`.  
+Подробнее: [docs/OPERATIONS.ru.md §7.2](docs/OPERATIONS.ru.md).
+
 ### 9. Безопасность SOCKS
 
 - **Нет пароля SOCKS** в v1 — публиковать `:1080` в интернет **нельзя**.

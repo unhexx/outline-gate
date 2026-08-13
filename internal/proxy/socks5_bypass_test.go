@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/unhexx/outline-gate/internal/bypass"
 )
 
 type recordingDialer struct {
@@ -207,5 +209,83 @@ func TestSOCKS5RecordsConnLogWithRule(t *testing.T) {
 	e := log.events[0]
 	if e.Via != "direct" || e.Rule != "bank.example" || !e.OK || e.Proto != "socks" {
 		t.Fatalf("%+v", e)
+	}
+}
+
+func TestSOCKS5StaticCIDRBypassUsesDirect(t *testing.T) {
+	bln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bln.Close()
+	go func() {
+		c, err := bln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		_, _ = io.Copy(c, c)
+	}()
+	backend := bln.Addr().String()
+
+	static := []net.IPNet{
+		{IP: net.ParseIP("192.168.0.0").To4(), Mask: net.CIDRMask(16, 32)},
+	}
+	mgr := bypass.NewManager(bypass.Options{StaticBypass: static})
+
+	var tunnelHits, directHits atomic.Int32
+	tunnel := &recordingDialer{name: "tunnel", hits: &tunnelHits, addr: backend}
+	direct := &recordingDialer{name: "direct", hits: &directHits, addr: backend}
+	s := &SOCKS5{
+		ListenAddr:   "127.0.0.1:0",
+		Dialer:       tunnel,
+		DirectDialer: direct,
+		Bypass:       mgr,
+		Timeout:      5 * time.Second,
+	}
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	s.ln = ln
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go s.handle(ctx, conn)
+		}
+	}()
+
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(c, resp); err != nil {
+		t.Fatal(err)
+	}
+	ip := net.ParseIP("192.168.1.50").To4()
+	req := []byte{0x05, 0x01, 0x00, 0x01, ip[0], ip[1], ip[2], ip[3], 0x00, 0x50}
+	if _, err := c.Write(req); err != nil {
+		t.Fatal(err)
+	}
+	reply := make([]byte, 10)
+	if _, err := io.ReadFull(c, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply[1] != 0x00 {
+		t.Fatalf("socks status %d", reply[1])
+	}
+	if directHits.Load() != 1 || tunnelHits.Load() != 0 {
+		t.Fatalf("direct=%d tunnel=%d (RFC1918 must be direct)", directHits.Load(), tunnelHits.Load())
 	}
 }

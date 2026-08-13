@@ -147,16 +147,18 @@
   }
 
   function setReadyPill(ready) {
+    let label = "VPN —";
+    let cls = "pill pill-muted";
     if (ready === true) {
-      el.readyPill.textContent = "VPN ready";
-      el.readyPill.className = "pill pill-ok";
+      label = "VPN ready";
+      cls = "pill pill-ok";
     } else if (ready === false) {
-      el.readyPill.textContent = "VPN down";
-      el.readyPill.className = "pill pill-bad";
-    } else {
-      el.readyPill.textContent = "VPN —";
-      el.readyPill.className = "pill pill-muted";
+      label = "VPN down";
+      cls = "pill pill-bad";
     }
+    el.readyPill.className = cls;
+    el.readyPill.innerHTML =
+      '<img class="ico" src="icons/vpn.svg" alt="" width="12" height="12" /> ' + label;
   }
 
   /* Tabs */
@@ -264,7 +266,7 @@
   }
 
   function eventMatches(e) {
-    if (filter === "vpn" && e.via === "direct") return false;
+    if (filter === "vpn" && e.via !== "tunnel") return false;
     if (filter === "direct" && e.via !== "direct") return false;
     if (filter === "socks" && e.proto !== "socks") return false;
     if (filter === "l3" && e.proto !== "l3") return false;

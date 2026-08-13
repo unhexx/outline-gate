@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -171,6 +172,24 @@ func TestParseCIDROrIP(t *testing.T) {
 	_, err = ParseCIDROrIP("not-an-ip")
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestPersistAccessKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "key.runtime.txt")
+	if err := PersistAccessKey(path, "ss://secret@1.2.3.4:8388"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "ss://secret@1.2.3.4:8388") {
+		t.Fatalf("content: %q", b)
+	}
+	if err := PersistAccessKey(path, ""); err == nil {
+		t.Fatal("empty key should fail")
 	}
 }
 

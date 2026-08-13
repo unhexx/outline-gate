@@ -94,6 +94,37 @@ func TestConcurrentRecord(t *testing.T) {
 	}
 }
 
+func TestUnsubscribeDuringRecordDoesNotPanic(t *testing.T) {
+	s := New(200)
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, unsub := s.Subscribe()
+			done := make(chan struct{})
+			go func() {
+				for range ch {
+				}
+				close(done)
+			}()
+			for j := 0; j < 50; j++ {
+				s.Record(Event{OK: true, Via: ViaTunnel})
+			}
+			unsub()
+			<-done
+		}()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			s.Record(Event{OK: true, Via: ViaDirect})
+		}
+	}()
+	wg.Wait()
+}
+
 func TestStats(t *testing.T) {
 	s := New(10)
 	s.Record(Event{Via: ViaTunnel, OK: true, Time: time.Now().UTC()})

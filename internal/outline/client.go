@@ -3,6 +3,7 @@ package outline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -30,9 +31,14 @@ type Client struct {
 	dialer   transport.StreamDialer
 	serverIP net.IP
 	ready    atomic.Bool
+	failN    atomic.Int32
 
 	providers *configurl.ProviderContainer
 }
+
+// transportFailThreshold consecutive transport timeouts mark the dialer not ready
+// so MaintainReady rebuilds it. Destination-level errors do not count.
+const transportFailThreshold = 5
 
 // Options configures Client construction.
 type Options struct {
@@ -106,6 +112,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	c.dialer = d
 	c.mu.Unlock()
+	c.failN.Store(0)
 	c.ready.Store(true)
 	return nil
 }
@@ -147,10 +154,43 @@ func (c *Client) DialContext(ctx context.Context, network, address string) (net.
 		return nil, fmt.Errorf("outline dialer not ready")
 	}
 	sc, err := d.DialStream(ctx, address)
+	c.noteDialResult(err)
 	if err != nil {
 		return nil, err
 	}
 	return sc, nil
+}
+
+func (c *Client) noteDialResult(err error) {
+	if err == nil {
+		c.failN.Store(0)
+		c.ready.Store(true)
+		return
+	}
+	if !c.isTransportFailure(err) {
+		return
+	}
+	if c.failN.Add(1) >= transportFailThreshold {
+		c.ready.Store(false)
+	}
+}
+
+func (c *Client) isTransportFailure(err error) bool {
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	msg := err.Error()
+	c.mu.RLock()
+	sip := ""
+	if c.serverIP != nil {
+		sip = c.serverIP.String()
+	}
+	c.mu.RUnlock()
+	if sip != "" && strings.Contains(msg, sip) {
+		return true
+	}
+	return strings.Contains(msg, "i/o timeout")
 }
 
 // MaintainReady periodically ensures the dialer exists. On failure, backs off and retries.

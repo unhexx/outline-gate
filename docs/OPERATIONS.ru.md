@@ -323,6 +323,88 @@ http://IP-хоста:28080/ui/
 | `example.com` | точный домен |
 | `*.cdn.example.net` | домен и поддомены (SOCKS; L3 — DNS apex) |
 
+**Предустановленные исключения** (шаблон `config/bypass.rules.example.txt` → runtime `bypass.rules.txt`):
+
+```text
+*.max.ru
+*.aq.ru
+*.aq.local
+*.aservice24.ru
+*.yandex.cloud
+*.yandex.ru
+```
+
+### 7.2. Исключения bypass: простые команды
+
+Порт health/UI = `HOST_HEALTH_PORT` (часто `28080`). Для API нужен `UI_ENABLE=true` и `UI_TOKEN`.
+
+```bash
+cd deploy/compose
+PORT="${HOST_HEALTH_PORT:-28080}"
+# UI_TOKEN из .env:
+set -a; source .env; set +a
+AUTH=(-H "Authorization: Bearer ${UI_TOKEN}")
+```
+
+**Список правил**
+
+```bash
+curl -s "${AUTH[@]}" "http://127.0.0.1:${PORT}/api/v1/bypass" | jq .
+```
+
+**Добавить исключение** (IP, CIDR, домен или `*.suffix`)
+
+```bash
+# один домен / маска
+curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"*.example.com"}' \
+  "http://127.0.0.1:${PORT}/api/v1/bypass"
+
+# IP или подсеть
+curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"203.0.113.0/24"}' \
+  "http://127.0.0.1:${PORT}/api/v1/bypass"
+```
+
+**Удалить исключение**
+
+```bash
+# query-параметр
+curl -s -X DELETE "${AUTH[@]}" \
+  "http://127.0.0.1:${PORT}/api/v1/bypass?rule=*.example.com"
+
+# или JSON body
+curl -s -X DELETE "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"*.example.com"}' \
+  "http://127.0.0.1:${PORT}/api/v1/bypass"
+```
+
+**Применить DNS-резолв сразу** (L3-сеты после смены доменов)
+
+```bash
+curl -s -X POST "${AUTH[@]}" "http://127.0.0.1:${PORT}/api/v1/bypass/apply"
+```
+
+**Без UI/API — правка файла + reload**
+
+```bash
+# 1) правите runtime-файл (монтируется в /config)
+$EDITOR deploy/compose/config/bypass.rules.txt
+# 2) перечитать правила без пересоздания контейнера
+docker kill -s HUP outline-gate
+# или:
+docker compose kill -s HUP
+```
+
+Строка = одно правило; `#` — комментарий. Пример добавить вручную:
+
+```bash
+echo '*.new-service.example' >> deploy/compose/config/bypass.rules.txt
+docker kill -s HUP outline-gate
+```
+
+Удалить строку из файла (sed/редактор) и снова `SIGHUP`.
+
 API (тот же токен; порт = `HOST_HEALTH_PORT`):
 
 ```bash
@@ -336,14 +418,7 @@ curl -s -X PUT -H "Authorization: Bearer $UI_TOKEN" \
   -d '{"access_key":"ss://...@host:port"}' \
   http://127.0.0.1:$PORT/api/v1/outline
 
-# список bypass
-curl -s -H "Authorization: Bearer $UI_TOKEN" http://127.0.0.1:$PORT/api/v1/bypass
-
-# добавить правило
-curl -s -X POST -H "Authorization: Bearer $UI_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"rule":"*.example.com"}' \
-  http://127.0.0.1:$PORT/api/v1/bypass
+# список / добавить / удалить — см. §7.2 выше
 ```
 
 `/healthz` и `/readyz` **без** токена (для healthcheck).

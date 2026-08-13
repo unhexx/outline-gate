@@ -58,6 +58,13 @@ func TestAPIAuthAndCRUD(t *testing.T) {
 		t.Fatalf("want 401, got %d", rr.Code)
 	}
 
+	// query token is SSE-only; must not open CRUD APIs
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/bypass?token=secret", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("query token on bypass: want 401, got %d", rr.Code)
+	}
+
 	// add
 	body := bytes.NewBufferString(`{"rule":"example.com"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/bypass", body)
@@ -157,30 +164,40 @@ func TestConnectionsAPIAndSSE(t *testing.T) {
 		t.Fatalf("%+v", body)
 	}
 
-	// SSE with query token
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	req = httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/connections/stream?token=secret", nil)
+	// ?token= must not authorize non-SSE endpoints (leaks in logs / Referer).
 	rr = httptest.NewRecorder()
-	done := make(chan struct{})
-	go func() {
-		mux.ServeHTTP(rr, req)
-		close(done)
-	}()
-	// wait for snapshot flush
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if strings.Contains(rr.Body.String(), "event: snapshot") {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/connections?token=secret", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("query token on snapshot: want 401, got %d", rr.Code)
 	}
-	cancel()
-	<-done
-	out := rr.Body.String()
+
+	// SSE with query token via real server (avoids httptest.ResponseRecorder race).
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/api/v1/connections/stream?token=secret", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("sse status: %d", resp.StatusCode)
+	}
+	buf := make([]byte, 4096)
+	n, err := resp.Body.Read(buf)
+	if n == 0 && err != nil {
+		t.Fatalf("sse read: %v", err)
+	}
+	out := string(buf[:n])
 	if !strings.Contains(out, "event: snapshot") || !strings.Contains(out, "example.com") {
 		t.Fatalf("sse body: %s", out)
 	}
+	cancel()
 
 	// status
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)

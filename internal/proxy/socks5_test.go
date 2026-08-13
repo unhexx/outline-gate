@@ -176,6 +176,23 @@ func TestSOCKS5RejectAllowlist(t *testing.T) {
 	}
 }
 
+func TestSetAllowCIDRs(t *testing.T) {
+	s := &SOCKS5{}
+	s.SetAllowCIDRs([]net.IPNet{
+		{IP: net.ParseIP("10.0.0.0").To4(), Mask: net.CIDRMask(8, 32)},
+	})
+	if !ipAllowed("10.1.2.3", s.allowList()) {
+		t.Fatal("10/8 should be allowed after SetAllowCIDRs")
+	}
+	if ipAllowed("127.0.0.1", s.allowList()) {
+		t.Fatal("loopback should be denied after SetAllowCIDRs")
+	}
+	s.SetAllowCIDRs(nil)
+	if !ipAllowed("8.8.8.8", s.allowList()) {
+		t.Fatal("empty allowlist means allow all")
+	}
+}
+
 func TestSOCKS5RejectIPv6(t *testing.T) {
 	s := &SOCKS5{
 		ListenAddr: "127.0.0.1:0",

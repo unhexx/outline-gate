@@ -233,12 +233,12 @@ func run() error {
 	}()
 
 	socks := &proxy.SOCKS5{
-		ListenAddr:  cfg.SOCKSListen,
-		Dialer:      client,
-		Bypass:      bypassMgr,
-		AllowCIDRs:  cfg.SOCKSAllowCIDRs,
-		ConnLog:     connHook,
-		Logger:      log,
+		ListenAddr: cfg.SOCKSListen,
+		Dialer:     client,
+		Bypass:     bypassMgr,
+		AllowCIDRs: cfg.SOCKSAllowCIDRs,
+		ConnLog:    connHook,
+		Logger:     log,
 	}
 	wg.Add(1)
 	go func() {
@@ -350,6 +350,7 @@ func run() error {
 				}
 				mu.Lock()
 				cfg = newCfg
+				socks.SetAllowCIDRs(cfg.SOCKSAllowCIDRs)
 				if gw != nil {
 					engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
 					wasActive := gw.Active()

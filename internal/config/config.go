@@ -85,19 +85,19 @@ func Load() (*Config, error) {
 // LoadFromEnv is like Load but uses getenv for testability.
 func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	cfg := &Config{
-		RoutingMode:      ModeExclude,
-		DirectPolicy:     DirectAllow,
-		LANInterface:     "",
-		GatewayEnable:    false,
-		SOCKSListen:      "0.0.0.0:1080",
-		HealthListen:     "0.0.0.0:8080",
-		LogLevel:         "info",
-		LogFormat:        "text",
-		ReconnectBase:    time.Second,
-		ReconnectMax:     60 * time.Second,
-		DNSMode:          DNSSystem,
-		TransproxyListen: "127.0.0.1:12345",
-		TransproxyPort:   12345,
+		RoutingMode:          ModeExclude,
+		DirectPolicy:         DirectAllow,
+		LANInterface:         "",
+		GatewayEnable:        false,
+		SOCKSListen:          "0.0.0.0:1080",
+		HealthListen:         "0.0.0.0:8080",
+		LogLevel:             "info",
+		LogFormat:            "text",
+		ReconnectBase:        time.Second,
+		ReconnectMax:         60 * time.Second,
+		DNSMode:              DNSSystem,
+		TransproxyListen:     "127.0.0.1:12345",
+		TransproxyPort:       12345,
 		UIEnable:             false,
 		BypassRulesFile:      "/config/bypass.rules.txt",
 		BypassDNSRefresh:     60 * time.Second,
@@ -272,8 +272,23 @@ func PersistAccessKey(path, key string) error {
 	}
 	content := "# outline-gate runtime access key (managed by UI/API)\n" + key + "\n"
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(content), 0o600); err != nil {
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
 		return fmt.Errorf("write temp: %w", err)
+	}
+	if _, err := f.WriteString(content); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmp)
+		return fmt.Errorf("sync temp: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("close temp: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)

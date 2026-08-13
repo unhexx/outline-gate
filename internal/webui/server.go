@@ -62,6 +62,9 @@ func (s *Server) Mount(mux *http.ServeMux) {
 		mux.Handle("/api/v1/outline/", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
 	}
 	if s.ConnLog != nil {
+		// ?token= is accepted only on the EventSource stream (no Authorization header).
+		mux.Handle("/api/v1/connections/stream", tokenAuthSSE(s.Token, http.HandlerFunc(s.handleConnectionsStream)))
+		mux.Handle("/api/v1/connections/stream/", tokenAuthSSE(s.Token, http.HandlerFunc(s.handleConnectionsStream)))
 		connAPI := http.HandlerFunc(s.routeConnectionsAPI)
 		mux.Handle("/api/v1/connections", tokenAuth(s.Token, connAPI))
 		mux.Handle("/api/v1/connections/", tokenAuth(s.Token, connAPI))

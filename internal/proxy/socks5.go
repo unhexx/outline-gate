@@ -61,13 +61,16 @@ type SOCKS5 struct {
 	Bypass BypassChecker
 	// AllowCIDRs, when non-empty, accepts only clients whose source IP is in
 	// one of the networks. Empty means allow all (trusted LAN).
+	// Update at runtime with SetAllowCIDRs (SIGHUP).
 	AllowCIDRs []net.IPNet
 	// ConnLog optionally records each CONNECT for the live UI log.
 	ConnLog ConnRecorder
 	Logger  *slog.Logger
 	Timeout time.Duration
 
-	ln net.Listener
+	allowMu sync.RWMutex
+	lnMu    sync.Mutex
+	ln      net.Listener
 }
 
 // ListenAndServe starts serving until the listener is closed or ctx cancelled.
@@ -85,7 +88,9 @@ func (s *SOCKS5) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.lnMu.Lock()
 	s.ln = ln
+	s.lnMu.Unlock()
 	s.Logger.Info("SOCKS5 listening", "addr", ln.Addr().String())
 
 	go func() {
@@ -113,10 +118,30 @@ func (s *SOCKS5) ListenAndServe(ctx context.Context) error {
 
 // Close stops the listener.
 func (s *SOCKS5) Close() error {
-	if s.ln != nil {
-		return s.ln.Close()
+	s.lnMu.Lock()
+	ln := s.ln
+	s.lnMu.Unlock()
+	if ln != nil {
+		return ln.Close()
 	}
 	return nil
+}
+
+// SetAllowCIDRs replaces the SOCKS source allowlist (nil/empty = allow all).
+func (s *SOCKS5) SetAllowCIDRs(nets []net.IPNet) {
+	s.allowMu.Lock()
+	defer s.allowMu.Unlock()
+	if len(nets) == 0 {
+		s.AllowCIDRs = nil
+		return
+	}
+	s.AllowCIDRs = append([]net.IPNet(nil), nets...)
+}
+
+func (s *SOCKS5) allowList() []net.IPNet {
+	s.allowMu.RLock()
+	defer s.allowMu.RUnlock()
+	return s.AllowCIDRs
 }
 
 func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
@@ -126,7 +151,7 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 		log = slog.Default()
 	}
 	clientIP := clientIPOf(conn)
-	if len(s.AllowCIDRs) > 0 && !ipAllowed(clientIP, s.AllowCIDRs) {
+	if allow := s.allowList(); len(allow) > 0 && !ipAllowed(clientIP, allow) {
 		log.Warn("SOCKS connection rejected: source not in allowlist", "client", clientIP)
 		return
 	}

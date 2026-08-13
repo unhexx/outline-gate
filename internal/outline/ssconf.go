@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -123,8 +125,11 @@ func parseDynamicBody(body string) (string, error) {
 		}
 		return "", fmt.Errorf("ssconf json missing server/port/method/password")
 	}
-	userinfo := base64.StdEncoding.EncodeToString([]byte(j.Method + ":" + j.Password))
-	ss := fmt.Sprintf("ss://%s@%s:%d", userinfo, j.Server, j.ServerPort)
+	// SIP002 / outline-sdk: URL-safe base64 without padding. StdEncoding can
+	// emit '/' and '+' which url.Parse treats as path / encoding, breaking host.
+	userinfo := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(j.Method + ":" + j.Password))
+	hostport := net.JoinHostPort(j.Server, strconv.Itoa(j.ServerPort))
+	ss := fmt.Sprintf("ss://%s@%s", userinfo, hostport)
 	if j.Prefix != "" {
 		ss += "?prefix=" + url.QueryEscape(j.Prefix)
 	}

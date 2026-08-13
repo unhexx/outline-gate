@@ -24,6 +24,19 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 - `configure.sh`: профиль socks|host, UI_TOKEN (автоген), порты, SOCKS allowlist; bootstrap `config/*`
 - `.env.example`: `HOST_HEALTH_PORT=28080` по умолчанию, комментарии allowlist / `COMPOSE_PROFILE`
 - Runtime `config/bypass.rules.txt` больше не в git (шаблон — `bypass.rules.example.txt`)
+- `bypass.rules.example.txt`: предустановленные исключения `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`
+- Docs: простые команды добавления/удаления bypass (API + файл + `SIGHUP`) — `OPERATIONS.ru.md` §7.2, README
+
+### Fixed
+
+- SOCKS IP CONNECT now bypasses static/RFC1918 CIDRs (`BYPASS_CIDRS`), not only user rules
+- `?token=` authorizes only `GET /api/v1/connections/stream` (no longer all `/api/*`)
+- connlog: no panic when an SSE client unsubscribes during `Record`
+- ssconf JSON → `ss://`: URL-safe base64 (SIP002) and IPv6 `JoinHostPort`
+- Outline client marks not-ready after consecutive transport timeouts so `MaintainReady` reconnects
+- SIGHUP applies `SOCKS_ALLOW_CIDRS` to the live SOCKS listener
+- Persist access key with fsync; `/readyz` 503 JSON Content-Type
+- Web UI: VPN log filter no longer includes Drop; ready pill keeps its icon
 
 ## [0.4.0] — 2026-07-27
 

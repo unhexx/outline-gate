@@ -2,9 +2,12 @@ package outline
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +34,48 @@ func TestResolveServerIP_Multipart(t *testing.T) {
 	_, err := ResolveServerIP("split:5|ss://x@1.2.3.4:1")
 	if err == nil {
 		t.Fatal("expected error for multi-part")
+	}
+}
+
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "dial tcp 9.9.9.9:1: i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }
+
+func TestTransportFailuresMarkNotReady(t *testing.T) {
+	c := &Client{reconnectBase: time.Second, reconnectMax: time.Second}
+	c.serverIP = []byte{45, 151, 102, 145}
+	c.ready.Store(true)
+
+	c.noteDialResult(fmt.Errorf("destination connection refused"))
+	if !c.Ready() {
+		t.Fatal("destination errors must not flip ready")
+	}
+
+	for i := 1; i < transportFailThreshold; i++ {
+		c.noteDialResult(timeoutErr{})
+		if !c.Ready() {
+			t.Fatalf("still ready after %d timeouts", i)
+		}
+	}
+	c.noteDialResult(timeoutErr{})
+	if c.Ready() {
+		t.Fatal("expected not ready after consecutive transport timeouts")
+	}
+
+	c.noteDialResult(nil)
+	if !c.Ready() {
+		t.Fatal("successful dial should restore ready")
+	}
+}
+
+func TestIsTransportFailureServerIP(t *testing.T) {
+	c := &Client{}
+	c.serverIP = []byte{1, 2, 3, 4}
+	err := fmt.Errorf("dial tcp 1.2.3.4:11097: connection refused")
+	if !c.isTransportFailure(err) {
+		t.Fatal("error mentioning Outline server IP is transport failure")
 	}
 }
 
@@ -107,5 +152,51 @@ func TestParseDynamicBody_ProviderError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "access key deleted") {
 		t.Fatalf("want provider message in error, got %v", err)
+	}
+}
+
+func TestParseDynamicBody_URLSafeUserinfoAndIPv6(t *testing.T) {
+	j := outlineJSON{
+		Server:     "10.0.0.1",
+		ServerPort: 443,
+		Method:     "chacha20-ietf-poly1305",
+		Password:   "secret/with+chars??",
+	}
+	std := base64.StdEncoding.EncodeToString([]byte(j.Method + ":" + j.Password))
+	if !strings.ContainsAny(std, "/+") {
+		t.Fatalf("fixture must produce std base64 / or +, got %s", std)
+	}
+	body, err := json.Marshal(j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss, err := parseDynamicBody(string(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Hostname() != "10.0.0.1" || u.Port() != "443" {
+		t.Fatalf("host broken by userinfo encoding: %q host=%q port=%q", ss, u.Hostname(), u.Port())
+	}
+	userinfo := u.User.String()
+	if strings.ContainsAny(userinfo, "/+") {
+		t.Fatalf("userinfo must be URL-safe, got %q in %s", userinfo, ss)
+	}
+
+	j.Server = "2001:db8::1"
+	body, _ = json.Marshal(j)
+	ss, err = parseDynamicBody(string(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err = url.Parse(ss)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Hostname() != "2001:db8::1" || u.Port() != "443" {
+		t.Fatalf("IPv6 host: %q host=%q port=%q", ss, u.Hostname(), u.Port())
 	}
 }

@@ -42,7 +42,8 @@ type Transparent struct {
 	Logger  *slog.Logger
 	Timeout time.Duration
 
-	ln net.Listener
+	lnMu sync.Mutex
+	ln   net.Listener
 }
 
 // ListenAndServe starts the transparent proxy.
@@ -60,7 +61,9 @@ func (t *Transparent) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	t.lnMu.Lock()
 	t.ln = ln
+	t.lnMu.Unlock()
 	t.Logger.Info("transparent proxy listening", "addr", ln.Addr().String())
 
 	go func() {
@@ -88,8 +91,11 @@ func (t *Transparent) ListenAndServe(ctx context.Context) error {
 
 // Close stops the listener.
 func (t *Transparent) Close() error {
-	if t.ln != nil {
-		return t.ln.Close()
+	t.lnMu.Lock()
+	ln := t.ln
+	t.lnMu.Unlock()
+	if ln != nil {
+		return ln.Close()
 	}
 	return nil
 }

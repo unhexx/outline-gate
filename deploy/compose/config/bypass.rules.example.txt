@@ -5,3 +5,11 @@
 # 203.0.113.0/24
 # example.com
 # *.cdn.example.net
+
+# Corporate / local services (direct, not via Outline)
+*.max.ru
+*.aq.ru
+*.aq.local
+*.aservice24.ru
+*.yandex.cloud
+*.yandex.ru
