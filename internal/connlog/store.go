@@ -114,20 +114,16 @@ func (s *Store) Record(e Event) Event {
 		copy(s.buf[0:], s.buf[1:])
 		s.buf[len(s.buf)-1] = e
 	}
-	// snapshot subscribers under lock
-	subs := make([]chan Event, 0, len(s.subs))
+	// Fan-out under the same lock as Subscribe/unsubscribe so we never send
+	// on a channel that unsubscribe has already closed.
 	for ch := range s.subs {
-		subs = append(subs, ch)
-	}
-	s.mu.Unlock()
-
-	for _, ch := range subs {
 		select {
 		case ch <- e:
 		default:
 			// slow subscriber: drop this event for them
 		}
 	}
+	s.mu.Unlock()
 	return e
 }
 
