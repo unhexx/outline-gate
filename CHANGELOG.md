@@ -1,7 +1,7 @@
 # Changelog
 
 [![Release](https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver)](https://github.com/unhexx/outline-gate/releases/latest)
-[![CI](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml)
+[![CI](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml)
 
 All notable changes to this project are documented in this file.
 
@@ -12,21 +12,19 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ## [Unreleased]
 
-### Added
-
-- README: connectivity check that compares host vs SOCKS egress without printing addresses; stack badges
-- README / DEPLOY / OPERATIONS: раздел «прокси и шлюз одновременно» (`./install.sh --host` = SOCKS5 + L3)
-
-## [0.6.0] — 2026-08-17
+## [0.6.0] — 2026-09-01
 
 ### Added
 
 - Destination block list: IP / CIDR / domain / `*.suffix` (`BLOCK_RULES_FILE`, Web UI tab **Блок**, `GET/POST/DELETE /api/v1/block`)
 - Blocked SOCKS and L3 connections appear in the live log as **Блок** (`via=drop`) with the matched rule
+- README: connectivity check that compares host vs SOCKS egress without printing addresses
+- README / DEPLOY / OPERATIONS: раздел «прокси и шлюз одновременно» (`./install.sh --host` = SOCKS5 + L3)
 
 ### Changed
 
-- README badges and install docs for v0.6.0
+- README / CHANGELOG badges are live (CI on `main`, GitHub release, Go module version, license)
+- Decorative stack badges removed from README
 
 ## [0.5.0] — 2026-08-17
 

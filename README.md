@@ -1,50 +1,15 @@
 # outline-gate
 
 <p align="center">
-  <a href="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml"><img src="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml"><img src="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://github.com/unhexx/outline-gate/releases/latest"><img src="https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver" alt="Release"></a>
   <a href="https://github.com/unhexx/outline-gate/releases/latest"><img src="https://img.shields.io/github/release-date/unhexx/outline-gate" alt="Release date"></a>
-  <a href="https://github.com/unhexx/outline-gate/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/version-v0.6.0-blue" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://semver.org/"><img src="https://img.shields.io/badge/semver-2.0.0-informational" alt="SemVer"></a>
-</p>
-<p align="center">
-  <a href="go.mod"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/unhexx/outline-gate" alt="Go"></a>
   <a href="https://pkg.go.dev/github.com/unhexx/outline-gate"><img src="https://pkg.go.dev/badge/github.com/unhexx/outline-gate.svg" alt="Go Reference"></a>
-  <a href="go.mod"><img src="https://img.shields.io/badge/module-unhexx%2Foutline--gate-informational" alt="Go module"></a>
-  <a href="#web-ui"><img src="https://img.shields.io/badge/JavaScript-ES2020%20vanilla-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript"></a>
-  <a href="#web-ui"><img src="https://img.shields.io/badge/HTML5-UI-E34F26?logo=html5&logoColor=white" alt="HTML5"></a>
-  <a href="#web-ui"><img src="https://img.shields.io/badge/CSS3-UI-1572B6?logo=css3&logoColor=white" alt="CSS3"></a>
-  <a href="https://www.gnu.org/software/bash/"><img src="https://img.shields.io/badge/Bash-install%20%2F%20entrypoint-4EAA25?logo=gnubash&logoColor=white" alt="Bash"></a>
-  <a href="https://yaml.org/"><img src="https://img.shields.io/badge/YAML-Compose-cb171e?logo=yaml&logoColor=white" alt="YAML"></a>
-</p>
-<p align="center">
-  <a href="#сборка-образа"><img src="https://img.shields.io/badge/Linux-amd64-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
-  <a href="#сборка-образа"><img src="https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
-  <a href="deploy/compose/docker-compose.yml"><img src="https://img.shields.io/badge/Compose-v2-2496ED?logo=docker&logoColor=white" alt="Docker Compose"></a>
-  <a href="deploy/docker/Dockerfile"><img src="https://img.shields.io/badge/Alpine-3.21-0D597F?logo=alpinelinux&logoColor=white" alt="Alpine"></a>
-  <a href="Makefile"><img src="https://img.shields.io/badge/Make-build-brightgreen?logo=cmake&logoColor=white" alt="Make"></a>
-  <a href="https://github.com/unhexx/outline-gate/actions"><img src="https://img.shields.io/badge/GitHub_Actions-CI-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
-</p>
-<p align="center">
-  <a href="#использование-socks5"><img src="https://img.shields.io/badge/SOCKS5-RFC1928-lightgrey" alt="SOCKS5"></a>
-  <a href="https://getoutline.org/"><img src="https://img.shields.io/badge/Outline-client-3dd68c" alt="Outline"></a>
-  <a href="https://shadowsocks.org/"><img src="https://img.shields.io/badge/Shadowsocks-ss%20%2F%20ssconf-2B2B2B" alt="Shadowsocks"></a>
-  <a href="https://golang.getoutline.org/sdk"><img src="https://img.shields.io/badge/outline--sdk-transport-3dd68c" alt="outline-sdk"></a>
-  <a href="docs/routing.md"><img src="https://img.shields.io/badge/nftables-L3-orange" alt="nftables"></a>
-  <a href="docs/routing.md"><img src="https://img.shields.io/badge/L3-userspace_routing-3dd68c" alt="L3"></a>
-  <a href="docs/routing.md"><img src="https://img.shields.io/badge/TCP-IPv4_first-informational" alt="TCP IPv4"></a>
-  <a href="docs/routing.md"><img src="https://img.shields.io/badge/split--tunnel-exclude%20%7C%20include-blue" alt="split-tunnel"></a>
-</p>
-<p align="center">
-  <a href="#web-ui"><img src="https://img.shields.io/badge/Web_UI-live_log-3d8bfd" alt="Web UI"></a>
-  <a href="#web-ui"><img src="https://img.shields.io/badge/REST-JSON_API-0F4C81" alt="REST JSON API"></a>
-  <a href="#web-ui"><img src="https://img.shields.io/badge/SSE-EventSource-3d8bfd" alt="SSE"></a>
-  <a href="#prometheus-metrics"><img src="https://img.shields.io/badge/Prometheus-/metrics-E6522C?logo=prometheus&logoColor=white" alt="Prometheus"></a>
-  <a href="docs/OPERATIONS.ru.md"><img src="https://img.shields.io/badge/health-/readyz-success" alt="health"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/unhexx/outline-gate" alt="License"></a>
 </p>
 
-**Current release: [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64)
+**Current release: [v0.6.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -757,7 +722,7 @@ docker run --rm -d --name outline-gate \
 
 | Remote | URL | Default for release |
 |--------|-----|---------------------|
-| GitHub | https://github.com/unhexx/outline-gate | `master`, tags `v*` |
+| GitHub | https://github.com/unhexx/outline-gate | `main`, tags `v*` |
 | aservice (origin) | https://git.aservice24.ru/scm/expert/outline-gate.git | `master`, tags `v*` |
 
 ```bash
