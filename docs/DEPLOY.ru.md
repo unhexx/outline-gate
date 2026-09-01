@@ -1,5 +1,7 @@
 # Развёртывание outline-gate на другом хосте
 
+[English](DEPLOY.md) · **Русский**
+
 **Релиз:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · эксплуатация: [OPERATIONS.ru.md](OPERATIONS.ru.md)
 
 | Ресурс | URL |
@@ -305,8 +307,8 @@ sudo nft delete table inet outline_gate
 
 ## Связанные документы
 
-- [OPERATIONS.ru.md](OPERATIONS.ru.md) — полный справочник env, API, эксплуатация  
-- [deployment.md](deployment.md) — профили A/B/C (EN)  
-- [architecture.md](architecture.md) — компоненты  
-- [routing.md](routing.md) — exclude / include  
-- [README.md](../README.md) — обзор продукта  
+- [OPERATIONS.ru.md](OPERATIONS.ru.md) — полный справочник env, API, эксплуатация · [English](OPERATIONS.md)
+- [deployment.md](deployment.md) — профили A/B/C
+- [architecture.md](architecture.md) — компоненты
+- [routing.md](routing.md) — exclude / include
+- [README.ru.md](../README.ru.md) — обзор продукта · [English](../README.md)  

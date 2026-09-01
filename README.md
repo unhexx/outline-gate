@@ -9,81 +9,83 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/unhexx/outline-gate" alt="License"></a>
 </p>
 
+<p align="center"><strong>English</strong> · <a href="README.ru.md">Русский</a></p>
+
 **Current release: [v0.6.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
 
-## О продукте
+## About
 
-**outline-gate** — самодостаточный Docker-шлюз, который превращает [Outline](https://getoutline.org/) (Shadowsocks) access key в **рабочий VPN-доступ для LAN и приложений**: без клиентского GUI на каждом устройстве, с **split-tunnel** и **быстрым управлением исключениями**.
+**outline-gate** is a self-contained Docker gateway that turns an [Outline](https://getoutline.org/) (Shadowsocks) access key into **working VPN access for a LAN and for apps**: no Outline Client GUI on every device, with **split-tunnel** and a fast exception list.
 
-Один контейнер на Linux-хосте:
+One container on a Linux host:
 
-1. поднимает клиент Outline (`ss://` / `ssconf://`);
-2. отдаёт **SOCKS5** для выборочного proxy;
-3. опционально становится **default gateway** (L3 + nftables) для всего TCP-трафика сети;
-4. даёт **Web UI** для списка «не через VPN» и смены ключа без пересборки образа.
+1. brings up an Outline client (`ss://` / `ssconf://`);
+2. serves **SOCKS5** for opt-in proxy;
+3. optionally becomes the **default gateway** (L3 + nftables) for all TCP on the network;
+4. ships a **Web UI** to manage the "not via VPN" list and rotate the key without rebuilding the image.
 
-### Какие задачи решает оперативно
+### What it is for
 
-| Задача | Как outline-gate закрывает |
-|--------|----------------------------|
-| **VPN «на всю сеть»** без Outline Client на TV, IoT, смартфонах | L3: клиенты ставят GW на хост — трафик идёт через Outline |
-| **VPN только для части приложений** | SOCKS5 `:1080` в браузере, curl, Git, Docker — остальное без proxy |
-| **Split-tunnel: «всё через VPN, кроме…»** | Режим `exclude` + bypass (RFC1918, IP/CIDR, домены, `*.mask`) |
-| **Split-tunnel: «через VPN только выбранное»** | Режим `include` + `TUNNEL_CIDRS` (+ `direct` / `drop` для остального) |
-| **Не ломать локальную сеть и банки / внутренние API** | Always-bypass частных сетей + UI/API-список исключений |
-| **Сменить Outline-ключ без деплоя** | Web UI / `PUT /api/v1/outline` → reconnect + persist-файл |
-| **Быстро добавить «не гонять через VPN»** | Web UI: IP, подсеть, `example.com`, `*.cdn.example.net` |
-| **Заблокировать домены / адреса / маски** | Вкладка **Блок**; совпадения в логе как «Блок» |
-| **Проверить, что туннель жив** | `/readyz`, healthcheck Docker, egress-check через SOCKS |
-| **Единый сервис вместо зоопарка клиентов** | Compose + `.env` / secrets; ключ не вшит в образ |
-| **Динамический ключ провайдера** | `ssconf://` раскрывается при Connect и периодически перечитывается; TCP-probe туннеля сбрасывает застрявший dialer |
+| Job | How outline-gate covers it |
+|-----|----------------------------|
+| **VPN for the whole network** without Outline Client on TVs, IoT, phones | L3: clients set GW to the host; traffic goes through Outline |
+| **VPN for some apps only** | SOCKS5 `:1080` in the browser, curl, Git, Docker; everything else stays direct |
+| **Split-tunnel: everything via VPN except…** | `exclude` + bypass (RFC1918, IP/CIDR, domains, `*.mask`) |
+| **Split-tunnel: VPN only for selected destinations** | `include` + `TUNNEL_CIDRS` (+ `direct` / `drop` for the rest) |
+| **Do not break LAN, banks, internal APIs** | Always-bypass of private nets + UI/API exception list |
+| **Rotate the Outline key without a redeploy** | Web UI / `PUT /api/v1/outline` → reconnect + persist file |
+| **Quickly add "do not send through VPN"** | Web UI: IP, subnet, `example.com`, `*.cdn.example.net` |
+| **Block domains / addresses / masks** | **Block** tab; matches show as "Block" in the log |
+| **Check that the tunnel is alive** | `/readyz`, Docker healthcheck, egress-check via SOCKS |
+| **One service instead of a zoo of clients** | Compose + `.env` / secrets; the key is not baked into the image |
+| **Provider dynamic key** | `ssconf://` is resolved on Connect and re-fetched periodically; a TCP tunnel probe resets a stuck dialer |
 
-### Для кого
+### Who it is for
 
-- **Дом / малый офис** — один always-on Linux (NUC, mini-PC, VM): «роутер с Outline».
-- **Разработка и ops** — SOCKS для CLI/IDE/контейнеров, без смены системного VPN.
-- **Админы LAN** — централизованный egress и политика exclude/include, не per-device apps.
+- **Home / small office** — one always-on Linux box (NUC, mini-PC, VM): "a router with Outline".
+- **Dev and ops** — SOCKS for CLI/IDE/containers, without flipping a system VPN.
+- **LAN admins** — central egress and an exclude/include policy, not per-device apps.
 
-### Чем не является
+### What it is not
 
-- Не **Outline Server / Manager** — только **клиент** к уже выданному ключу.
-- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.6 — TCP-first; IPv6 L3 nft — gap).
-- Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (LAN + опционально `SOCKS_ALLOW_CIDRS`).
+- Not **Outline Server / Manager** — **client only**, for a key you already have.
+- Not full **DNS-over-VPN** and not full **UDP/L3** (v0.6 is TCP-first; IPv6 L3 nft is a gap).
+- Not a multi-user IdP: Web UI is one `UI_TOKEN`; SOCKS has **no password** (LAN + optional `SOCKS_ALLOW_CIDRS`).
 
 <p align="center">
-  <img src="docs/images/architecture-overview.svg" alt="Архитектура outline-gate: SOCKS5 и L3 gateway" width="920"/>
+  <img src="docs/images/architecture-overview.svg" alt="outline-gate architecture: SOCKS5 and L3 gateway" width="920"/>
 </p>
 
-## Возможности (технически)
+## Features
 
-- Клиент Outline через **outline-sdk** (`ss://`, `ssconf://`)
+- Outline client via **outline-sdk** (`ss://`, `ssconf://`)
 - **SOCKS5** (`:1080`) — explicit proxy; bypass → direct dial
 - **L3 gateway** (nftables): `exclude` / `include`, REDIRECT + MASQUERADE
-- **Web UI** (`/ui/`): компактный UI, live-лог, bypass, замена ключа; версия процесса из `/api/v1/version`
-- Конфиг: `.env`, volume-файлы, Docker secrets, SIGHUP-reload
-- Health: `/healthz`, `/readyz`; опционально Prometheus `/metrics` (`METRICS_ENABLE=true`)
+- **Web UI** (`/ui/`): compact UI, live log, bypass, key replace; process version from `/api/v1/version`
+- Config: `.env`, volume files, Docker secrets, SIGHUP reload
+- Health: `/healthz`, `/readyz`; optional Prometheus `/metrics` (`METRICS_ENABLE=true`)
 
-## Оглавление
+## Contents
 
-1. [О продукте](#о-продукте)
-2. [Быстрый старт](#быстрый-старт)
-   - [Прокси и шлюз одновременно](#прокси-и-шлюз-одновременно)
-3. [Проверка подключения](#проверка-подключения)
-4. [Релиз и установка](#релиз-и-установка)
-5. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
-6. [Использование SOCKS5](#использование-socks5)
-7. [Использование L3 gateway](#использование-l3-gateway)
+1. [About](#about)
+2. [Quick start](#quick-start)
+   - [Proxy and gateway together](#proxy-and-gateway-together)
+3. [Connectivity check](#connectivity-check)
+4. [Release and install](#release-and-install)
+5. [SOCKS5 vs L3](#socks5-vs-l3)
+6. [Using SOCKS5](#using-socks5)
+7. [Using L3 gateway](#using-l3-gateway)
 8. [Web UI](#web-ui)
-9. [Переменные окружения](#основные-переменные)
-10. [Сборка образа](#сборка-образа)
+9. [Environment variables](#environment-variables)
+10. [Building the image](#building-the-image)
 11. [Best practices](#best-practices)
-12. [Документация](#документация)
+12. [Documentation](#documentation)
 
 ---
 
-## Быстрый старт
+## Quick start
 
-Подробно: **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)**.
+Full steps: **[docs/DEPLOY.md](docs/DEPLOY.md)** · [Русский](docs/DEPLOY.ru.md).
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
@@ -91,18 +93,18 @@ cd outline-gate
 ./install.sh 'ss://YOUR_OUTLINE_KEY'
 
 curl -s http://127.0.0.1:28080/readyz
-# затем — [проверка подключения](#проверка-подключения)
+# then — [connectivity check](#connectivity-check)
 ```
 
-L3-шлюз (host network; **SOCKS5 тоже слушается**):
+L3 gateway (host network; **SOCKS5 still listens**):
 
 ```bash
 ./install.sh --host 'ss://YOUR_OUTLINE_KEY'
 ```
 
-### Прокси и шлюз одновременно
+### Proxy and gateway together
 
-`--host` поднимает **один** процесс с обоими режимами: SOCKS5 для приложений и L3-шлюз для LAN. Отдельный контейнер под прокси не нужен.
+`--host` starts **one** process in both modes: SOCKS5 for apps and L3 gateway for the LAN. You do not need a second container for the proxy.
 
 ```bash
 ./install.sh --host 'ss://YOUR_OUTLINE_KEY'
@@ -116,49 +118,49 @@ GATEWAY_ENABLE=true
 SOCKS_LISTEN=0.0.0.0:1080
 HEALTH_LISTEN=0.0.0.0:8080    # health + Web UI (host network)
 UI_ENABLE=true
-UI_TOKEN=ваш-секрет
+UI_TOKEN=your-secret
 ```
 
-| Что | Куда |
-|-----|------|
-| SOCKS5 | `HOST:1080` — браузер, curl, Git ([использование SOCKS5](#использование-socks5)) |
-| L3 gateway | default gateway клиентов = IP хоста ([использование L3](#использование-l3-gateway)) |
-| Web UI / health | `http://HOST:8080/ui/` (порт = `HEALTH_LISTEN`) |
+| What | Where |
+|------|-------|
+| SOCKS5 | `HOST:1080` — browser, curl, Git ([using SOCKS5](#using-socks5)) |
+| L3 gateway | clients' default gateway = host IP ([using L3](#using-l3-gateway)) |
+| Web UI / health | `http://HOST:8080/ui/` (port = `HEALTH_LISTEN`) |
 
-Проверка:
+Check:
 
 ```bash
 curl -s http://127.0.0.1:8080/readyz
 curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
-# затем — [проверка подключения](#проверка-подключения)
+# then — [connectivity check](#connectivity-check)
 ```
 
-Не запускайте рядом `docker-compose.yml` и `docker-compose.host.yml`: контейнер один (`outline-gate`), порты 1080 и health пересекаются.  
-Bridge-профиль (`GATEWAY_ENABLE=true` без host-сети) не станет LAN-шлюзом «из коробки».
+Do not run `docker-compose.yml` and `docker-compose.host.yml` side by side: the container name is `outline-gate`, ports 1080 and health collide.  
+A bridge profile with `GATEWAY_ENABLE=true` is not a LAN gateway out of the box.
 
-Bridge-сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM; не расходует Docker `default-address-pools`).  
-Пример daemon: [`deploy/docker/daemon.json.example`](deploy/docker/daemon.json.example).
+Bridge network `outline-gate_net` = `192.168.102.0/24` (explicit IPAM; does not consume Docker `default-address-pools`).  
+Daemon example: [`deploy/docker/daemon.json.example`](deploy/docker/daemon.json.example).
 
 ---
 
-## Проверка подключения
+## Connectivity check
 
-На профиле **SOCKS-only** (`GATEWAY_ENABLE=false`) хост **не** маршрутизирует трафик в туннель сам. В VPN попадает только клиент, который **явно** использует SOCKS. Прямой запрос с хоста всегда показывает ISP-путь — это не поломка.
+On a **SOCKS-only** profile (`GATEWAY_ENABLE=false`) the host does **not** send its own traffic into the tunnel. Only a client that **explicitly** uses SOCKS goes via VPN. A direct request from the host always shows the ISP path — that is not a bug.
 
-### 1. Процесс жив
+### 1. Process is alive
 
 ```bash
 curl -fsS --max-time 5 "http://127.0.0.1:${HOST_HEALTH_PORT:-28080}/readyz"
 ```
 
-Ожидание: HTTP 200 и `"ready":true`. Иначе смотрите `docker compose logs` — ключ, сеть до Outline, ssconf.
+Expect HTTP 200 and `"ready":true`. Otherwise see `docker compose logs` — key, path to Outline, ssconf.
 
-### 2. Сравнить путь хоста и путь SOCKS
+### 2. Compare host path vs SOCKS path
 
-Нужен любой **HTTPS IP-echo** (сервис, который отвечает телом с адресом клиента). URL в переменную, значения **не печатать**:
+You need any **HTTPS IP-echo** (a service that replies with the client address in the body). Put the URL in a variable and **do not print** the values:
 
 ```bash
-# задайте свой echo-URL
+# set your own echo URL
 : "${IP_ECHO:?set IP_ECHO to an HTTPS IP-echo URL}"
 
 SOCKS="socks5h://127.0.0.1:${HOST_SOCKS_PORT:-1080}"
@@ -174,49 +176,49 @@ else
 fi
 ```
 
-| Результат | Значение |
-|-----------|----------|
-| строки **разные** | трафик через SOCKS ушёл в Outline |
-| строки **одинаковые** | запрос не через туннель (нет proxy, fallback, или `GATEWAY_ENABLE=false` и клиент ходил напрямую) |
-| ошибка curl / SOCKS `0x08` | часто локальный резолв в IPv6: нужен **`socks5h`**, не `socks5` |
+| Result | Meaning |
+|--------|---------|
+| strings **differ** | traffic through SOCKS went into Outline |
+| strings **match** | request did not use the tunnel (no proxy, fallback, or `GATEWAY_ENABLE=false` and the client went direct) |
+| curl error / SOCKS `0x08` | often local IPv6 resolve: use **`socks5h`**, not `socks5` |
 
-**`socks5h`** (и `curl --socks5-hostname`) резолвит имя **на стороне proxy**. Схема `socks5://` резолвит на хосте; при AAAA outline-gate отклоняет IPv6 CONNECT — клиент может уйти в обход прокси.
+**`socks5h`** (and `curl --socks5-hostname`) resolves the name **on the proxy**. Scheme `socks5://` resolves on the host; outline-gate rejects IPv6 CONNECT, so the client may skip the proxy.
 
-В браузере: SOCKS5 + **DNS through SOCKS**. В журнале UI (**Лог**) успешная проверка — цепочка `SOCKS → VPN`.
+In a browser: SOCKS5 + **DNS through SOCKS**. In the UI log a successful check is the chain `SOCKS → VPN`.
 
-### 3. Чего не делать
+### 3. What not to do
 
-- Не судить по прямому curl/браузеру на хосте: без SOCKS это всегда ISP.
-- Не вставлять в отчёты и тикеты полученные адреса.
-- Не путать готовность процесса (`/readyz`) с тем, что *ваше* приложение настроено на `:1080`.
+- Do not judge by a direct curl/browser on the host: without SOCKS that is always the ISP.
+- Do not paste the resulting addresses into tickets.
+- Do not confuse process readiness (`/readyz`) with *your* app actually using `:1080`.
 
 ---
 
-## Релиз и установка
+## Release and install
 
-| Канал | Ссылка |
-|-------|--------|
+| Channel | Link |
+|---------|------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
 | Latest tag | [`v0.6.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Module path | `github.com/unhexx/outline-gate` |
-| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.6.0`) |
+| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (branch `master`, tag `v0.6.0`) |
 
-### Docker (рекомендуется)
+### Docker (recommended)
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-./install.sh 'ss://...'          # или: git checkout v0.6.0 && ./install.sh 'ss://...'
+./install.sh 'ss://...'          # or: git checkout v0.6.0 && ./install.sh 'ss://...'
 ```
 
-Образ с меткой релиза:
+Image with the release tag:
 
 ```bash
 docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.6.0 -t outline-gate:v0.6.0 .
 ```
 
-### Бинарник Linux amd64
+### Linux amd64 binary
 
 ```bash
 curl -fsSL -o outline-gate \
@@ -226,37 +228,37 @@ export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate
 ```
 
-Требуется Linux (для L3 — root/`NET_ADMIN` + `nft`). Для production предпочтителен Docker-образ.
+Needs Linux (L3 needs root/`NET_ADMIN` + `nft`). Prefer the Docker image in production.
 
 ---
 
-## SOCKS5 vs L3 — что выбрать
+## SOCKS5 vs L3
 
 <p align="center">
-  <img src="docs/images/compare-modes.svg" alt="Сравнение SOCKS5 и L3 gateway" width="920"/>
+  <img src="docs/images/compare-modes.svg" alt="SOCKS5 vs L3 gateway" width="920"/>
 </p>
 
-| Критерий | SOCKS5 | L3 gateway |
-|----------|--------|------------|
-| Настройка клиента | proxy в приложении | default gateway / static route |
-| Охват | только apps с proxy | почти весь TCP LAN-трафик |
+| | SOCKS5 | L3 gateway |
+|--|--------|------------|
+| Client setup | proxy in the app | default gateway / static route |
+| Coverage | only apps with proxy | almost all LAN TCP |
 | Compose | `docker-compose.yml`, `GATEWAY_ENABLE=false` | `docker-compose.host.yml`, `GATEWAY_ENABLE=true` |
-| Привилегии | обычный Docker | `NET_ADMIN`, nftables, часто `network_mode: host` |
-| Домены в bypass | **точный** match hostname | DNS → IP (best-effort) |
-| UDP | не в v1 | не в v1 (TCP-first) |
-| Типичный кейс | ноутбук, браузер, CLI | TV, IoT, «роутер с VPN» |
+| Privileges | ordinary Docker | `NET_ADMIN`, nftables, usually `network_mode: host` |
+| Domains in bypass | **exact** hostname match | DNS → IP (best-effort) |
+| UDP | not in v1 | not in v1 (TCP-first) |
+| Typical case | laptop, browser, CLI | TV, IoT, "router with VPN" |
 
-**Можно использовать оба сразу:** L3 для устройств без proxy + SOCKS для приложений на том же хосте. Быстрый старт: [прокси и шлюз одновременно](#прокси-и-шлюз-одновременно).
+**You can use both at once:** L3 for devices without a proxy + SOCKS for apps on the same host. Quick start: [proxy and gateway together](#proxy-and-gateway-together).
 
 ---
 
-## Использование SOCKS5
+## Using SOCKS5
 
 <p align="center">
-  <img src="docs/images/socks5-flow.svg" alt="Поток SOCKS5" width="920"/>
+  <img src="docs/images/socks5-flow.svg" alt="SOCKS5 flow" width="920"/>
 </p>
 
-### 1. Запуск (bridge, только SOCKS)
+### 1. Start (bridge, SOCKS only)
 
 `deploy/compose/.env`:
 
@@ -268,7 +270,7 @@ SOCKS_LISTEN=0.0.0.0:1080
 HOST_SOCKS_PORT=1080
 HOST_HEALTH_PORT=28080
 UI_ENABLE=true
-UI_TOKEN=ваш-секрет
+UI_TOKEN=your-secret
 ```
 
 ```bash
@@ -277,15 +279,15 @@ docker compose up --build -d
 curl -s http://127.0.0.1:28080/readyz
 ```
 
-Дальше — [проверка подключения](#проверка-подключения) (`socks5h`, сравнение путей без печати адресов).
+Then [connectivity check](#connectivity-check) (`socks5h`, compare paths without printing addresses).
 
 ### 2. curl / wget
 
 ```bash
-# HTTP(S) через SOCKS (DNS на стороне proxy)
+# HTTP(S) via SOCKS (DNS on the proxy)
 curl -x socks5h://127.0.0.1:1080 "$IP_ECHO"
 
-# эквивалент
+# same
 curl --socks5-hostname 127.0.0.1:1080 "$IP_ECHO"
 
 export ALL_PROXY=socks5h://127.0.0.1:1080
@@ -293,242 +295,241 @@ curl -fsS "$IP_ECHO" >/dev/null
 unset ALL_PROXY
 ```
 
-С другого хоста LAN подставьте адрес машины с outline-gate вместо loopback (тот же `socks5h` и порт `HOST_SOCKS_PORT`).
+From another LAN host, use the outline-gate machine address instead of loopback (same `socks5h` and `HOST_SOCKS_PORT`).
 
 ### 3. Firefox
 
 1. **Settings → Network Settings → Settings…**
 2. **Manual proxy configuration**
-3. **SOCKS Host:** `127.0.0.1` (или IP gate), **Port:** `1080`
-4. Выберите **SOCKS v5**
-5. Включите **Proxy DNS when using SOCKS v5**
-6. OK → откройте любой IP-echo по HTTPS и сравните с запросом *без* proxy (как в [проверке подключения](#проверка-подключения))
+3. **SOCKS Host:** `127.0.0.1` (or the gate IP), **Port:** `1080`
+4. Select **SOCKS v5**
+5. Enable **Proxy DNS when using SOCKS v5**
+6. OK → open any HTTPS IP-echo and compare with a request *without* proxy (as in [connectivity check](#connectivity-check))
 
 ### 4. Chromium / Chrome
 
-Chrome не имеет встроенного SOCKS-UI. Варианты:
+Chrome has no built-in SOCKS UI. Options:
 
 ```bash
-# Linux: отдельный профиль + proxy-server
+# Linux: separate profile + proxy-server
 google-chrome --user-data-dir=/tmp/chrome-socks \
   --proxy-server="socks5://127.0.0.1:1080" \
   --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE localhost"
 ```
 
-(Chrome сам резолвит DNS, если не задать resolver-rules; для проверки egress надёжнее curl + `socks5h`.)
+(Chrome resolves DNS itself unless you set resolver-rules; for an egress check, curl + `socks5h` is more reliable.)
 
-Или расширение / системный proxy (зависит от ОС).
+Or an extension / system proxy (OS-dependent).
 
 ### 5. SSH over SOCKS (ProxyCommand / Dynamic)
 
-Если нужен SSH *через* Outline:
+SSH *through* Outline:
 
 ```bash
-# ssh с ProxyCommand + nc/connect через SOCKS
 ssh -o ProxyCommand='nc -X 5 -x 127.0.0.1:1080 %h %p' user@remote-host
 ```
 
-(набор `nc`/`ncat` зависит от дистрибутива; альтернатива — `connect-proxy`.)
+(`nc`/`ncat` depends on the distro; `connect-proxy` is an alternative.)
 
-### 6. Git через SOCKS
+### 6. Git via SOCKS
 
 ```bash
 git config --global http.proxy socks5h://127.0.0.1:1080
 git config --global https.proxy socks5h://127.0.0.1:1080
-# отключить:
+# disable:
 git config --global --unset http.proxy
 git config --global --unset https.proxy
 ```
 
-### 7. Docker-контейнер, ходящий наружу через SOCKS
+### 7. Docker container egress via SOCKS
 
 ```bash
 docker run --rm curlimages/curl:latest \
   -x "socks5h://host.docker.internal:${HOST_SOCKS_PORT:-1080}" "$IP_ECHO"
-# Linux: добавьте --add-host=host.docker.internal:host-gateway
+# Linux: add --add-host=host.docker.internal:host-gateway
 ```
 
-### 8. Bypass в SOCKS
+### 8. Bypass in SOCKS
 
-Если destination **совпал** с правилом bypass (IP/CIDR/домен/`*.mask` из UI или `BYPASS_*`), outline-gate dial'ит **напрямую**, минуя Outline. Иначе — через туннель.
+If the destination **matches** a bypass rule (IP/CIDR/domain/`*.mask` from the UI or `BYPASS_*`), outline-gate dials **direct**, skipping Outline. Otherwise through the tunnel.
 
 ```bash
-# пример: добавить исключение в UI или:
+# example: add an exception in the UI, or:
 # BYPASS_CIDRS=8.8.8.8/32
 # BYPASS_RULES_FILE=/config/bypass.rules.txt  →  example.com
 ```
 
-**Предустановленные маски** (шаблон → `config/bypass.rules.txt`):  
+**Preset masks** (template → `config/bypass.rules.txt`):  
 `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`.
 
-**Простые команды** (нужны `UI_ENABLE=true` + `UI_TOKEN`; порт = `HOST_HEALTH_PORT`):
+**Simple commands** (need `UI_ENABLE=true` + `UI_TOKEN`; port = `HOST_HEALTH_PORT`):
 
 ```bash
 PORT=28080
 AUTH=(-H "Authorization: Bearer $UI_TOKEN")
 
-# список
+# list
 curl -s "${AUTH[@]}" "http://127.0.0.1:${PORT}/api/v1/bypass"
 
-# добавить
+# add
 curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
   -d '{"rule":"*.example.com"}' "http://127.0.0.1:${PORT}/api/v1/bypass"
 
-# удалить
+# delete
 curl -s -X DELETE "${AUTH[@]}" \
   "http://127.0.0.1:${PORT}/api/v1/bypass?rule=*.example.com"
 
-# блок-лист (drop)
+# block list (drop)
 curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
   -d '{"rule":"*.ads.example"}' "http://127.0.0.1:${PORT}/api/v1/block"
 ```
 
-Без UI: правка `deploy/compose/config/bypass.rules.txt` или `block.rules.txt` + `docker kill -s HUP outline-gate`.  
-Подробнее: [docs/OPERATIONS.ru.md §7.2](docs/OPERATIONS.ru.md).
+Without UI: edit `deploy/compose/config/bypass.rules.txt` or `block.rules.txt` + `docker kill -s HUP outline-gate`.  
+Details: [docs/OPERATIONS.md §7.2](docs/OPERATIONS.md).
 
-### 9. Безопасность SOCKS
+### 9. SOCKS security
 
-- **Нет пароля SOCKS** в v1 — публиковать `:1080` в интернет **нельзя**.
-- Ограничьте firewall: только LAN / `127.0.0.1`.
-- Опционально: `SOCKS_ALLOW_CIDRS` (CSV) или `SOCKS_ALLOW_CIDRS_FILE` — allowlist **source IP** клиента. Пусто = принимать всех (как раньше).
-- Не коммитьте `.env` с ключами.
+- **No SOCKS password** in v1 — do **not** publish `:1080` to the internet.
+- Restrict firewall: LAN / `127.0.0.1` only.
+- Optional: `SOCKS_ALLOW_CIDRS` (CSV) or `SOCKS_ALLOW_CIDRS_FILE` — **source IP** allowlist. Empty = accept all (as before).
+- Do not commit `.env` with keys.
 
 ```bash
-# только loopback и LAN 10.0.0.0/8
+# loopback and LAN 10.0.0.0/8 only
 SOCKS_ALLOW_CIDRS=127.0.0.0/8,10.0.0.0/8
 ```
 
 ---
 
-## Использование L3 gateway
+## Using L3 gateway
 
-L3-режим делает хост **маршрутизатором**: LAN-клиенты ставят **default gateway** (или policy route) на IP машины с outline-gate. nftables решает: redirect TCP в transparent proxy → Outline, или оставить direct.
+L3 mode makes the host a **router**: LAN clients set **default gateway** (or a policy route) to the outline-gate machine. nftables decides: redirect TCP into the transparent proxy → Outline, or leave it direct.
 
-### Предпосылки
+### Prerequisites
 
-- Linux-хост в той же L2/L3 сети, что и клиенты
+- Linux host on the same L2/L3 network as the clients
 - `GATEWAY_ENABLE=true`
-- Обычно: `docker compose -f docker-compose.host.yml` (`network_mode: host`)
+- Usually: `docker compose -f docker-compose.host.yml` (`network_mode: host`)
 - Capability `NET_ADMIN`, `ip_forward=1`
-- Клиенты: IPv4 gateway = LAN IP хоста (пример: `192.168.1.10`)
+- Clients: IPv4 gateway = host LAN IP (example: `192.168.1.10`)
 
-### Запуск (host network)
+### Start (host network)
 
 `deploy/compose/.env`:
 
 ```bash
 OUTLINE_ACCESS_KEY=ss://...@server:port
 GATEWAY_ENABLE=true
-ROUTING_MODE=exclude          # или include
-# LAN_INTERFACE=eth0          # опционально, для MASQUERADE oif
-HOST_HEALTH_PORT=28080        # при host network порты слушаются напрямую
+ROUTING_MODE=exclude          # or include
+# LAN_INTERFACE=eth0          # optional, for MASQUERADE oif
+HOST_HEALTH_PORT=28080        # on host network, ports are bound directly
 UI_ENABLE=true
-UI_TOKEN=ваш-секрет
+UI_TOKEN=your-secret
 ```
 
 ```bash
 cd deploy/compose
 docker compose -f docker-compose.host.yml up --build -d
-curl -s http://127.0.0.1:8080/readyz   # при host: HEALTH_LISTEN как есть
-# или http://192.168.1.10:8080/readyz
+curl -s http://127.0.0.1:8080/readyz   # host: HEALTH_LISTEN as-is
+# or http://192.168.1.10:8080/readyz
 ```
 
-### Настройка клиента (пример Linux)
+### Client setup (Linux example)
 
 ```bash
-# предположим, хост gate: 192.168.1.10, интерфейс клиента eth0
+# assume gate host: 192.168.1.10, client iface eth0
 sudo ip route replace default via 192.168.1.10 dev eth0
 
-# DNS (важно: DNS-утечки не «лечатся» L3 автоматически)
-# либо router DNS, либо 1.1.1.1 — осознанно
+# DNS (L3 does not "fix" DNS leaks by itself)
+# router DNS, or 1.1.1.1 — pick on purpose
 ```
 
 **Windows (GUI):**  
-Параметры → Сеть → Свойства адаптера → IPv4 → Шлюз: `192.168.1.10`.
+Settings → Network → adapter properties → IPv4 → Gateway: `192.168.1.10`.
 
 **Android / iOS:**  
-Статический IP Wi‑Fi → Router / Gateway = IP host с outline-gate.
+Wi-Fi static IP → Router / Gateway = host IP running outline-gate.
 
-### Проверка L3
+### L3 check
 
-На клиенте (без SOCKS): тот же скрипт [проверки подключения](#проверка-подключения), но «direct» снимите с машины **вне** этого шлюза. При рабочем exclude egress клиента не должен совпадать с ISP той контрольной машины. RFC1918 остаётся на kernel-path.
+On a client (no SOCKS): the same [connectivity check](#connectivity-check) script, but take "direct" from a machine **outside** this gateway. With working exclude, the client's egress must not match that control machine's ISP. RFC1918 stays on the kernel path.
 
-На хосте:
+On the host:
 
 ```bash
 docker logs outline-gate --tail=50
-# table nft (host network):
+# nft table (host network):
 sudo nft list table inet outline_gate
 ```
 
-Остановка / сброс правил:
+Stop / flush rules:
 
 ```bash
 docker compose -f docker-compose.host.yml down
-# при аварийном kill:
+# after a hard kill:
 sudo nft delete table inet outline_gate
 ```
 
 ---
 
-### Режим `exclude` (по умолчанию)
+### `exclude` mode (default)
 
 <p align="center">
-  <img src="docs/images/l3-exclude.svg" alt="L3 режим exclude" width="920"/>
+  <img src="docs/images/l3-exclude.svg" alt="L3 exclude mode" width="920"/>
 </p>
 
-**Смысл:** весь TCP (не из bypass) → туннель Outline.  
-Идеально: «VPN на всю квартиру, кроме локалки и выбранных сервисов».
+**Meaning:** all TCP not in bypass → Outline tunnel.  
+Fit: "VPN for the whole apartment, except LAN and chosen services".
 
 ```bash
 ROUTING_MODE=exclude
 GATEWAY_ENABLE=true
-# опционально доп. исключения:
+# extra exceptions optional:
 BYPASS_CIDRS=203.0.113.0/24
-# или через Web UI: example.com, *.cdn.example.net
+# or via Web UI: example.com, *.cdn.example.net
 ```
 
-**Логика:**
+**Logic:**
 
 ```text
-if dst ∈ bypass (RFC1918 + UI + BYPASS_* + IP Outline-сервера)
+if dst ∈ bypass (RFC1918 + UI + BYPASS_* + Outline server IP)
     → DIRECT
 else
     → TUNNEL (nft REDIRECT → Outline)
 ```
 
-**Практика: исключить банк / внутренний API**
+**Practice: exclude a bank / internal API**
 
-1. Web UI → добавить `bank.example.com` или `10.50.0.0/16`
-2. Или файл `/config/bypass.rules.txt`:
+1. Web UI → add `bank.example.com` or `10.50.0.0/16`
+2. Or file `/config/bypass.rules.txt`:
 
 ```text
 bank.example.com
 203.0.113.0/24
 ```
 
-3. SIGHUP / UI apply / DNS refresh — L3 set обновится.
+3. SIGHUP / UI apply / DNS refresh — the L3 set updates.
 
 ---
 
-### Режим `include`
+### `include` mode
 
 <p align="center">
-  <img src="docs/images/l3-include.svg" alt="L3 режим include" width="920"/>
+  <img src="docs/images/l3-include.svg" alt="L3 include mode" width="920"/>
 </p>
 
-**Смысл:** через VPN **только** адреса из `TUNNEL_*`. Остальное — `DIRECT_POLICY` (`direct` или `drop`).  
-Идеально: «только зарубежные сервисы / офисные CIDR через Outline, остальной интернет — как был».
+**Meaning:** VPN **only** for addresses in `TUNNEL_*`. The rest is `DIRECT_POLICY` (`direct` or `drop`).  
+Fit: "only foreign services / office CIDRs through Outline, the rest of the internet as before".
 
 ```bash
 ROUTING_MODE=include
 GATEWAY_ENABLE=true
 TUNNEL_CIDRS=8.8.8.8/32,203.0.113.0/24
-# или TUNNEL_CIDRS_FILE=/config/tunnel.txt
+# or TUNNEL_CIDRS_FILE=/config/tunnel.txt
 DIRECT_POLICY=direct
 ```
 
-**Логика:**
+**Logic:**
 
 ```text
 if dst ∈ bypass          → DIRECT
@@ -536,7 +537,7 @@ elif dst ∈ tunnel list   → TUNNEL
 else                     → DIRECT_POLICY  # direct | drop
 ```
 
-**Практика: только Google DNS и одна подсеть через VPN**
+**Practice: only Google DNS and one subnet via VPN**
 
 ```bash
 # .env
@@ -546,114 +547,114 @@ DIRECT_POLICY=direct
 GATEWAY_ENABLE=true
 ```
 
-На клиенте с GW=gate проще `traceroute` / `tcpdump` по адресам из `TUNNEL_CIDRS`, чем IP-echo: echo-сервис почти наверняка не входит в include-список.
+On a client with GW=gate, `traceroute` / `tcpdump` to addresses in `TUNNEL_CIDRS` is simpler than IP-echo: the echo service is almost certainly not in the include list.
 
-**`DIRECT_POLICY=drop`:** всё, что не bypass и не tunnel, **режется** (жёсткий allow-list). Осторожно: легко «убить» интернет на клиентах, если tunnel-список неполный.
+**`DIRECT_POLICY=drop`:** everything that is not bypass and not tunnel is **cut** (hard allow-list). Easy to kill internet on clients if the tunnel list is incomplete.
 
 ```bash
 DIRECT_POLICY=drop
 TUNNEL_CIDRS=1.2.3.0/24
-# клиент достучится до 1.2.3.0/24 через Outline; 8.8.8.8 — drop
+# client reaches 1.2.3.0/24 via Outline; 8.8.8.8 is drop
 ```
 
 ---
 
-### L3: ограничения v1
+### L3: v1 limits
 
-| Тема | Поведение |
-|------|-----------|
-| Протоколы | TCP redirect; **UDP не полный** |
-| Домены в bypass | резолв A/AAAA + refresh (`BYPASS_DNS_REFRESH`); редкие поддомены могут кратко уйти в tunnel |
-| IPv6 | **не туннелируется** L3: nft-сеты `ipv4_addr`, IPv6 CIDR в bypass пропускаются; на dual-stack хосте IPv6 идёт **мимо** Outline (direct). SOCKS IPv6 ATYP отвергается. Полный dual-stack — roadmap |
-| DNS | не «магический tunnel DNS»; настраивайте DNS на клиентах отдельно |
-| Always bypass | RFC1918, CGNAT, link-local, IP сервера Outline |
+| Topic | Behaviour |
+|-------|-----------|
+| Protocols | TCP redirect; **UDP is not complete** |
+| Domains in bypass | A/AAAA resolve + refresh (`BYPASS_DNS_REFRESH`); rare subdomains may briefly go into the tunnel |
+| IPv6 | **not tunnelled** on L3: nft sets are `ipv4_addr`, IPv6 CIDR in bypass is skipped; on a dual-stack host IPv6 goes **around** Outline (direct). SOCKS IPv6 ATYP is rejected. Full dual-stack is roadmap |
+| DNS | not "magic tunnel DNS"; configure DNS on clients separately |
+| Always bypass | RFC1918, CGNAT, link-local, Outline server IP |
 
-Подробнее: [`docs/routing.md`](docs/routing.md).
+Details: [`docs/routing.md`](docs/routing.md).
 
 ---
 
 ## Web UI
 
 <p align="center">
-  <img src="docs/images/webui-mockup.svg" alt="Макет Web UI outline-gate" width="720"/>
+  <img src="docs/images/webui-mockup.svg" alt="outline-gate Web UI mockup" width="720"/>
 </p>
 
-### Вход: логин и пароль по умолчанию
+### Sign-in: no default login/password
 
-**Отдельного логина/пароля нет** — и **нет учётных данных по умолчанию** (`admin` / `password` не существуют).
+**There is no separate login/password** and **no default credentials** (`admin` / `password` do not exist).
 
-| Что | По умолчанию |
-|-----|----------------|
-| Web UI | **выключен** (`UI_ENABLE=false`) |
-| Логин | **не используется** |
-| Пароль / токен | **задаёте сами** в `UI_TOKEN` |
+| | Default |
+|--|---------|
+| Web UI | **off** (`UI_ENABLE=false`) |
+| Login | **not used** |
+| Password / token | **you set** `UI_TOKEN` |
 
 ```bash
 # deploy/compose/.env
 UI_ENABLE=true
-UI_TOKEN=ваш-длинный-случайный-секрет
+UI_TOKEN=your-long-random-secret
 HOST_HEALTH_PORT=28080
 ```
 
 ```bash
-openssl rand -hex 24   # → в UI_TOKEN
+openssl rand -hex 24   # → UI_TOKEN
 docker compose up -d --force-recreate
-# http://127.0.0.1:28080/ui/  → поле «Токен доступа» = UI_TOKEN
+# http://127.0.0.1:28080/ui/  → "Access token" = UI_TOKEN
 ```
 
-**Авторизация API**
+**API auth**
 
-| Способ | Как |
+| Method | How |
 |--------|-----|
-| Форма UI | `UI_TOKEN` → sessionStorage → `Authorization: Bearer …` |
+| UI form | `UI_TOKEN` → sessionStorage → `Authorization: Bearer …` |
 | curl | `Authorization: Bearer <UI_TOKEN>` |
-| HTTP Basic | username любой (`admin`), **password** = `UI_TOKEN` |
+| HTTP Basic | any username (`admin`), **password** = `UI_TOKEN` |
 
-| URL | Auth | Назначение |
-|-----|------|------------|
-| `/ui/` | токен для API | Web UI (вкладки: Статус · Лог · Bypass · Ключ) |
-| `GET /api/v1/status` | Bearer / Basic | сводка ready / SOCKS / gateway / connlog |
-| `GET /api/v1/connections` | Bearer / Basic | снимок ring-buffer подключений |
-| `GET /api/v1/connections/stream` | Bearer / Basic / `?token=` | SSE live-лог (EventSource) |
-| `GET/PUT /api/v1/outline` | Bearer / Basic | статус / замена ключа |
-| `GET/POST/DELETE /api/v1/bypass` | Bearer / Basic | правила исключений |
-| `GET/POST/DELETE /api/v1/block` | Bearer / Basic | блок-лист (drop + лог) |
-| `/healthz`, `/readyz` | нет | healthcheck |
+| URL | Auth | Purpose |
+|-----|------|---------|
+| `/ui/` | token for API | Web UI (tabs: Status · Log · Bypass · Key) |
+| `GET /api/v1/status` | Bearer / Basic | ready / SOCKS / gateway / connlog summary |
+| `GET /api/v1/connections` | Bearer / Basic | connection ring-buffer snapshot |
+| `GET /api/v1/connections/stream` | Bearer / Basic / `?token=` | SSE live log (EventSource) |
+| `GET/PUT /api/v1/outline` | Bearer / Basic | status / replace key |
+| `GET/POST/DELETE /api/v1/bypass` | Bearer / Basic | exception rules |
+| `GET/POST/DELETE /api/v1/block` | Bearer / Basic | block list (drop + log) |
+| `/healthz`, `/readyz` | none | healthcheck |
 
-**Лог подключений:** SOCKS и L3 показывают цепочку `клиент → SOCKS|L3 → VPN|Direct → host` (и правило bypass, если известно). На L3 private/RFC1918 остаётся kernel-path без записи в лог; остальной Internet TCP (включая user Direct) идёт через transparent proxy.
+**Connection log:** SOCKS and L3 show the chain `client → SOCKS|L3 → VPN|Direct → host` (and the bypass rule if known). On L3, private/RFC1918 stays on the kernel path with no log line; other Internet TCP (including user Direct) goes through the transparent proxy.
 
-Ключ, заменённый в UI → `OUTLINE_KEY_PERSIST_FILE` (по умолчанию `/config/outline_key.runtime.txt`), при старте **приоритетнее** `OUTLINE_ACCESS_KEY`.
+A key replaced in the UI is written to `OUTLINE_KEY_PERSIST_FILE` (default `/config/outline_key.runtime.txt`) and **wins** over `OUTLINE_ACCESS_KEY` on the next start.
 
 ---
 
-## Основные переменные
+## Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `OUTLINE_ACCESS_KEY` / `OUTLINE_ACCESS_KEY_FILE` | Ключ Outline `ss://` или `ssconf://` |
-| `OUTLINE_KEY_PERSIST_FILE` | Файл ключа после замены в UI |
+| `OUTLINE_ACCESS_KEY` / `OUTLINE_ACCESS_KEY_FILE` | Outline key `ss://` or `ssconf://` |
+| `OUTLINE_KEY_PERSIST_FILE` | Key file after a UI replace |
 | `ROUTING_MODE` | `exclude` \| `include` |
-| `BYPASS_CIDRS` / `BYPASS_CIDRS_FILE` | Статические CIDR-исключения |
-| `BYPASS_RULES_FILE` | User-правила (IP/домены) UI |
-| `BLOCK_RULES_FILE` | Блок-лист (IP/CIDR/домен/`*.mask`); drop + запись в лог |
-| `TUNNEL_CIDRS` / `TUNNEL_CIDRS_FILE` | Цели (include) |
+| `BYPASS_CIDRS` / `BYPASS_CIDRS_FILE` | Static CIDR exceptions |
+| `BYPASS_RULES_FILE` | User rules (IP/domains) from the UI |
+| `BLOCK_RULES_FILE` | Block list (IP/CIDR/domain/`*.mask`); drop + log |
+| `TUNNEL_CIDRS` / `TUNNEL_CIDRS_FILE` | Targets (include) |
 | `DIRECT_POLICY` | `direct` \| `drop` (include) |
 | `GATEWAY_ENABLE` | L3 nftables |
 | `UI_ENABLE` / `UI_TOKEN` | Web UI + API |
-| `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` | Порты на хосте (bridge compose) |
-| `SOCKS_LISTEN` / `HEALTH_LISTEN` | Слушатели в контейнере |
-| `SOCKS_ALLOW_CIDRS` / `_FILE` | Allowlist source IP для SOCKS (пусто = все; при non-loopback — `Warn` на старте) |
-| `METRICS_ENABLE` | `true` → Prometheus text на `/metrics` (health-порт) |
-| `SSCONF_REFRESH_INTERVAL` | Период перечитывания `ssconf://` (default `2m`, `0` = выкл.) |
-| `TUNNEL_PROBE_ADDR` | TCP-probe через туннель (default `1.1.1.1:443`, `off` = выкл.) |
-| `TUNNEL_PROBE_INTERVAL` / `_TIMEOUT` / `_FAILS` | Период / дедлайн / порог фейлов до reconnect |
+| `HOST_SOCKS_PORT` / `HOST_HEALTH_PORT` | Host ports (bridge compose) |
+| `SOCKS_LISTEN` / `HEALTH_LISTEN` | Listeners in the container |
+| `SOCKS_ALLOW_CIDRS` / `_FILE` | SOCKS source IP allowlist (empty = all; non-loopback → `Warn` at start) |
+| `METRICS_ENABLE` | `true` → Prometheus text on `/metrics` (health port) |
+| `SSCONF_REFRESH_INTERVAL` | How often to re-fetch `ssconf://` (default `2m`, `0` = off) |
+| `TUNNEL_PROBE_ADDR` | TCP probe through the tunnel (default `1.1.1.1:443`, `off` = off) |
+| `TUNNEL_PROBE_INTERVAL` / `_TIMEOUT` / `_FAILS` | Period / deadline / fail threshold before reconnect |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 
-Полный список: [`deploy/compose/.env.example`](deploy/compose/.env.example).
+Full list: [`deploy/compose/.env.example`](deploy/compose/.env.example).
 
 ### Prometheus metrics
 
-Опциональный endpoint **без auth** на том же порту, что health/UI (`HEALTH_LISTEN` / `HOST_HEALTH_PORT`).
+Optional **unauthenticated** endpoint on the same port as health/UI (`HEALTH_LISTEN` / `HOST_HEALTH_PORT`).
 
 ```bash
 # deploy/compose/.env
@@ -666,17 +667,17 @@ curl -s http://127.0.0.1:${HOST_HEALTH_PORT:-8080}/metrics
 # outline_gate_connections_total{via="tunnel",result="ok"} …
 ```
 
-Переменная пробрасывается в compose (`METRICS_ENABLE`). Не публикуйте health-порт в интернет без firewall — `/metrics` открыт как `/healthz`.
+The variable is passed through compose (`METRICS_ENABLE`). Do not publish the health port to the internet without a firewall — `/metrics` is as open as `/healthz`.
 
 ---
 
-## Сборка образа
+## Building the image
 
 ```bash
 docker build -f deploy/docker/Dockerfile -t outline-gate:local .
 ```
 
-Ключ **не** вшивается в образ:
+The key is **not** baked into the image:
 
 ```bash
 docker run --rm -d --name outline-gate \
@@ -695,30 +696,31 @@ docker run --rm -d --name outline-gate \
 
 ## Best practices
 
-1. **Секреты** — `.env` / secrets / UI persist-файл; никогда в git и образ.
-2. **UI_TOKEN** — длинный случайный; UI/API не в публичный интернет без TLS reverse-proxy.
-3. **SOCKS `:1080`** — только LAN / localhost; auth SOCKS в v1 нет.
-4. **L3** — всегда auto-bypass IP Outline-сервера; проверяйте после смены ключа.
-5. **Домены на L3** — best-effort; для точного hostname-match используйте SOCKS.
-6. **Обновления** — `docker compose up --build -d`; rules в volume `./config`.
-7. **DNS** — настройте отдельно; L3 не заменяет DoH/DoT-политику.
+1. **Secrets** — `.env` / secrets / UI persist file; never git, never the image.
+2. **UI_TOKEN** — long random; keep UI/API off the public internet without a TLS reverse-proxy.
+3. **SOCKS `:1080`** — LAN / localhost only; no SOCKS auth in v1.
+4. **L3** — always auto-bypass the Outline server IP; re-check after a key change.
+5. **Domains on L3** — best-effort; use SOCKS for exact hostname match.
+6. **Updates** — `docker compose up --build -d`; rules live in volume `./config`.
+7. **DNS** — configure separately; L3 does not replace a DoH/DoT policy.
 
 ---
 
-## Документация
+## Documentation
 
-| Документ | Содержание |
-|----------|------------|
-| **[docs/DEPLOY.ru.md](docs/DEPLOY.ru.md)** | Развёртывание на другом хосте (пошагово, RU) |
-| **[docs/OPERATIONS.ru.md](docs/OPERATIONS.ru.md)** | Полный справочник развёртывания и эксплуатации (RU) |
-| [docs/architecture.md](docs/architecture.md) | Архитектура компонентов |
-| [docs/deployment.md](docs/deployment.md) | Профили сети A/B/C |
-| [docs/routing.md](docs/routing.md) | Режимы маршрутизации и bypass |
-| [docs/images/](docs/images/) | Схемы и иллюстрации |
-| [CHANGELOG.md](CHANGELOG.md) | История релизов (Keep a Changelog) |
-| [Releases](https://github.com/unhexx/outline-gate/releases) | Бинарники и notes |
+| Doc | Contents |
+|-----|----------|
+| **[docs/DEPLOY.md](docs/DEPLOY.md)** | Deploy on another host (step by step) · [Русский](docs/DEPLOY.ru.md) |
+| **[docs/OPERATIONS.md](docs/OPERATIONS.md)** | Full deploy and operations reference · [Русский](docs/OPERATIONS.ru.md) |
+| [docs/architecture.md](docs/architecture.md) | Component architecture |
+| [docs/deployment.md](docs/deployment.md) | Network profiles A/B/C |
+| [docs/routing.md](docs/routing.md) | Routing modes and bypass |
+| [docs/images/](docs/images/) | Diagrams |
+| [CHANGELOG.md](CHANGELOG.md) | Release history (Keep a Changelog) |
+| [Releases](https://github.com/unhexx/outline-gate/releases) | Binaries and notes |
+| [README.ru.md](README.ru.md) | Russian README |
 
-## Репозиторий
+## Repository
 
 | Remote | URL | Default for release |
 |--------|-----|---------------------|
@@ -737,13 +739,13 @@ cd outline-gate
 git checkout v0.6.0
 ```
 
-## Безопасность
+## Security
 
-- SOCKS без auth — только доверенная сеть (`SOCKS_ALLOW_CIDRS` рекомендуется)
-- Не коммитьте `.env`, `*.runtime.txt` и реальные ключи
-- В логах ключ редактируется (`ss://***@host:port`)
-- API UI без токена → `401` (`/api/v1/version` публичный)
-- Ограничения v0.6: TCP-first (UDP L3 неполный), IPv6 nft gap, domain-bypass на L3 — best-effort
+- SOCKS without auth — trusted network only (`SOCKS_ALLOW_CIDRS` recommended)
+- Do not commit `.env`, `*.runtime.txt`, or real keys
+- Keys in logs are redacted (`ss://***@host:port`)
+- UI API without a token → `401` (`/api/v1/version` is public)
+- v0.6 limits: TCP-first (UDP L3 incomplete), IPv6 nft gap, domain-bypass on L3 is best-effort
 
 ## License
 

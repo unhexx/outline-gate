@@ -1,6 +1,6 @@
 # Architecture
 
-**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [docs/images/](images/)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [docs/images/](images/) · [README](../README.md) · [Русский](../README.ru.md)
 
 ```
 LAN clients ──► outline-gate ──ss:// / ssconf://──► Outline Server

@@ -1,6 +1,6 @@
 # Routing modes
 
-**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg) · [README](../README.md) · [Русский](../README.ru.md)
 
 ## Always bypass
 
@@ -85,6 +85,6 @@ Web UI / API updates `BYPASS_RULES_FILE` immediately and triggers DNS refresh + 
 
 ## Related
 
-- [OPERATIONS.ru.md](OPERATIONS.ru.md) — deploy steps
-- [README.md](../README.md) — SOCKS/L3 practical examples
+- [OPERATIONS.md](OPERATIONS.md) — deploy steps · [Русский](OPERATIONS.ru.md)
+- [README.md](../README.md) — SOCKS/L3 practical examples · [Русский](../README.ru.md)
 - [CHANGELOG.md](../CHANGELOG.md) — release notes

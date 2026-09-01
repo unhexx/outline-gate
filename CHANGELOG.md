@@ -12,6 +12,10 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation is English-first (`README.md`, `docs/DEPLOY.md`, `docs/OPERATIONS.md`) with a language switch to Russian (`README.ru.md`, `*.ru.md`)
+
 ## [0.6.0] — 2026-09-01
 
 ### Added

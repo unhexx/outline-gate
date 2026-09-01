@@ -1,6 +1,8 @@
 # outline-gate — пошаговая инструкция по развёртыванию и эксплуатации
 
-**Релиз:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
+[English](OPERATIONS.md) · **Русский**
+
+**Релиз:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.ru.md)
 
 > **Быстрый деплой на новый хост:** см. отдельную инструкцию **[DEPLOY.ru.md](DEPLOY.ru.md)**  
 > (`configure.sh` → `install.sh` → проверка). Этот документ — полный справочник.
@@ -10,7 +12,7 @@
 | GitHub | https://github.com/unhexx/outline-gate |
 | aservice | https://git.aservice24.ru/scm/expert/outline-gate.git |
 | Ветка релиза | `master` + tags `v*` |
-| Deploy (RU) | [DEPLOY.ru.md](DEPLOY.ru.md) |
+| Deploy | [DEPLOY.ru.md](DEPLOY.ru.md) · [English](DEPLOY.md) |
 
 ## 1. Что это
 
@@ -224,7 +226,7 @@ Windows/macOS/роутер: укажите default gateway / DHCP option 3.
 
 **Важно:** на bridge-сети Docker контейнер **не** становится LAN-gateway «из коробки». Для L3 используйте host (или macvlan — см. `docs/deployment.md`).
 
-SOCKS5 при `--host` **не отключается**: тот же процесс слушает `:1080`. Это и есть режим «прокси и шлюз одновременно» (см. [README § быстрый старт](../README.md#прокси-и-шлюз-одновременно)).
+SOCKS5 при `--host` **не отключается**: тот же процесс слушает `:1080`. Это и есть режим «прокси и шлюз одновременно» (см. [README § быстрый старт](../README.ru.md#прокси-и-шлюз-одновременно)).
 
 ### 6.3. Прокси и шлюз одновременно
 
@@ -588,8 +590,9 @@ git check-ignore -v deploy/compose/.env deploy/compose/config/bypass.rules.txt
 
 ## 11. Связанные документы
 
-- [DEPLOY.ru.md](DEPLOY.ru.md) — **развёртывание на другом хосте (пошагово)**  
-- [architecture.md](architecture.md) — схема компонентов  
-- [deployment.md](deployment.md) — профили A/B/C (EN)  
-- [routing.md](routing.md) — режимы маршрутизации  
-- [design-plan.md](design-plan.md) — полный дизайн / PR DAG  
+- [DEPLOY.ru.md](DEPLOY.ru.md) — **развёртывание на другом хосте (пошагово)** · [English](DEPLOY.md)
+- [architecture.md](architecture.md) — схема компонентов
+- [deployment.md](deployment.md) — профили A/B/C
+- [routing.md](routing.md) — режимы маршрутизации
+- [design-plan.md](design-plan.md) — полный дизайн / PR DAG
+- [README.ru.md](../README.ru.md) — обзор продукта · [English](../README.md)  

@@ -1,6 +1,6 @@
 # Deployment
 
-**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md) · new-host steps (RU): [DEPLOY.ru.md](DEPLOY.ru.md)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · full guide: [OPERATIONS.md](OPERATIONS.md) ([Русский](OPERATIONS.ru.md)) · new-host steps: [DEPLOY.md](DEPLOY.md) ([Русский](DEPLOY.ru.md))
 
 One-shot on a fresh host (after clone):
 
