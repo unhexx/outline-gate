@@ -21,6 +21,11 @@ type Registry struct {
 	L3Accept     atomic.Int64
 	DNSRefreshOK atomic.Int64
 	DNSRefreshEr atomic.Int64
+	ProbeOK      atomic.Int64
+	ProbeFail    atomic.Int64
+	RefreshOK    atomic.Int64
+	RefreshFail  atomic.Int64
+	RefreshChg   atomic.Int64
 	started      time.Time
 }
 
@@ -72,11 +77,11 @@ func (r *Registry) WritePrometheus(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "outline_gate_uptime_seconds %.0f\n", uptime)
 
 	writeCounter(w, "outline_gate_connections_total", "Proxy connection attempts", map[string]int64{
-		`via="tunnel",result="ok"`:     r.TunnelOK.Load(),
-		`via="tunnel",result="fail"`:   r.TunnelFail.Load(),
-		`via="direct",result="ok"`:     r.DirectOK.Load(),
-		`via="direct",result="fail"`:   r.DirectFail.Load(),
-		`via="drop",result="policy"`:   r.Drop.Load(),
+		`via="tunnel",result="ok"`:   r.TunnelOK.Load(),
+		`via="tunnel",result="fail"`: r.TunnelFail.Load(),
+		`via="direct",result="ok"`:   r.DirectOK.Load(),
+		`via="direct",result="fail"`: r.DirectFail.Load(),
+		`via="drop",result="policy"`: r.Drop.Load(),
 	})
 	writeCounter(w, "outline_gate_accepts_total", "Accepted client connections by proto", map[string]int64{
 		`proto="socks"`: r.SOCKSAccept.Load(),
@@ -86,6 +91,42 @@ func (r *Registry) WritePrometheus(w io.Writer) {
 		`result="ok"`:    r.DNSRefreshOK.Load(),
 		`result="error"`: r.DNSRefreshEr.Load(),
 	})
+	writeCounter(w, "outline_gate_tunnel_probe_total", "Outline tunnel probe outcomes", map[string]int64{
+		`result="ok"`:   r.ProbeOK.Load(),
+		`result="fail"`: r.ProbeFail.Load(),
+	})
+	writeCounter(w, "outline_gate_ssconf_refresh_total", "ssconf:// refresh outcomes", map[string]int64{
+		`result="ok"`:      r.RefreshOK.Load(),
+		`result="fail"`:    r.RefreshFail.Load(),
+		`result="changed"`: r.RefreshChg.Load(),
+	})
+}
+
+// ObserveProbe records a tunnel probe result.
+func (r *Registry) ObserveProbe(ok bool) {
+	if r == nil {
+		return
+	}
+	if ok {
+		r.ProbeOK.Add(1)
+	} else {
+		r.ProbeFail.Add(1)
+	}
+}
+
+// ObserveRefresh records an ssconf refresh attempt.
+func (r *Registry) ObserveRefresh(ok, changed bool) {
+	if r == nil {
+		return
+	}
+	if !ok {
+		r.RefreshFail.Add(1)
+		return
+	}
+	r.RefreshOK.Add(1)
+	if changed {
+		r.RefreshChg.Add(1)
+	}
 }
 
 func writeCounter(w io.Writer, name, help string, series map[string]int64) {

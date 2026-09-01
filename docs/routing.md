@@ -1,6 +1,6 @@
 # Routing modes
 
-**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [l3-exclude.svg](images/l3-exclude.svg) · [l3-include.svg](images/l3-include.svg) · [socks5-flow.svg](images/socks5-flow.svg)
 
 ## Always bypass
 
@@ -9,6 +9,7 @@ Regardless of mode, the following never go through the tunnel:
 - Default private/reserved ranges (RFC1918, CGNAT `100.64.0.0/10`, link-local, loopback, multicast, …)
 - Extra `BYPASS_CIDRS` / file
 - User rules from `BYPASS_RULES_FILE` / Web UI (`/ui/`): IP, CIDR, domains, `*.suffix`
+- User **block** rules from `BLOCK_RULES_FILE` / Web UI tab **Блок**: same syntax; match → drop (before bypass/tunnel), logged as `via=drop`
   - Default template includes: `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`
 - Resolved Outline server IPv4 (auto)
 
@@ -74,7 +75,7 @@ DIRECT_POLICY=direct
 
 ## IPv6 (known gap)
 
-L3 nftables sets use `type ipv4_addr`. IPv6 destinations are **not** redirected into the transparent proxy; on dual-stack hosts IPv6 traffic leaves the host **directly** (bypasses Outline). SOCKS5 rejects IPv6 ATYP (`0x04`). Full dual-stack is roadmap, not v0.4.
+L3 nftables sets use `type ipv4_addr`. IPv6 destinations are **not** redirected into the transparent proxy; on dual-stack hosts IPv6 traffic leaves the host **directly** (bypasses Outline). SOCKS5 rejects IPv6 ATYP (`0x04`). Full dual-stack is roadmap, not v0.6.
 
 ## Reload
 

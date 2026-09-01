@@ -40,6 +40,8 @@ bootstrap_config() {
 }
 bootstrap_config "$CONFIG_DIR/bypass.rules.txt" "$CONFIG_DIR/bypass.rules.example.txt" \
   "# outline-gate user bypass rules (managed by UI/API)"
+bootstrap_config "$CONFIG_DIR/block.rules.txt" "$CONFIG_DIR/block.rules.example.txt" \
+  "# outline-gate destination block rules (managed by UI/API)"
 bootstrap_config "$CONFIG_DIR/bypass.txt" "$CONFIG_DIR/bypass.example.txt"
 bootstrap_config "$CONFIG_DIR/tunnel.txt" "$CONFIG_DIR/tunnel.example.txt"
 
@@ -205,6 +207,7 @@ echo "Готово. Файлы:"
 echo "  $ENV_FILE"
 echo "  $KEY_FILE (если использовали файл ключа)"
 echo "  $CONFIG_DIR/bypass.rules.txt"
+echo "  $CONFIG_DIR/block.rules.txt"
 echo
 echo "Запуск (рекомендуется install.sh):"
 echo "  ./install.sh"

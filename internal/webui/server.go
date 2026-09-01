@@ -35,10 +35,11 @@ type RuntimeStatus struct {
 // Server serves /ui/ and /api/v1/*.
 type Server struct {
 	Manager Manager
+	Block   Manager           // optional: destination block list
 	Outline OutlineController // optional: key status / replace
 	ConnLog ConnLog           // optional: live connection log
 	Status  func() RuntimeStatus
-	// Version is the process release string (e.g. "v0.4.0"); exposed publicly.
+	// Version is the process release string (e.g. "v0.6.0"); exposed publicly.
 	Version string
 	Token   string
 	Static  fs.FS // usually //go:embed static
@@ -56,6 +57,11 @@ func (s *Server) Mount(mux *http.ServeMux) {
 		api := http.HandlerFunc(s.routeBypassAPI)
 		mux.Handle("/api/v1/bypass", tokenAuth(s.Token, api))
 		mux.Handle("/api/v1/bypass/", tokenAuth(s.Token, api))
+	}
+	if s.Block != nil {
+		api := http.HandlerFunc(s.routeBlockAPI)
+		mux.Handle("/api/v1/block", tokenAuth(s.Token, api))
+		mux.Handle("/api/v1/block/", tokenAuth(s.Token, api))
 	}
 	if s.Outline != nil {
 		mux.Handle("/api/v1/outline", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
@@ -101,26 +107,46 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) routeBypassAPI(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/bypass")
+	s.routeRulesAPI(s.Manager, "/api/v1/bypass", w, r)
+}
+
+func (s *Server) routeBlockAPI(w http.ResponseWriter, r *http.Request) {
+	s.routeRulesAPI(s.Block, "/api/v1/block", w, r)
+}
+
+func (s *Server) routeRulesAPI(mgr Manager, prefix string, w http.ResponseWriter, r *http.Request) {
+	if mgr == nil {
+		writeErr(w, http.StatusNotFound, "rules API disabled")
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, prefix)
 	path = strings.TrimSuffix(path, "/")
 	if path == "" {
-		s.handleBypass(w, r)
+		s.handleRules(mgr, w, r)
 		return
 	}
 	switch path {
 	case "/effective":
-		s.handleEffective(w, r)
+		s.handleEffective(mgr, w, r)
 	case "/apply":
-		s.handleApply(w, r)
+		s.handleApply(mgr, w, r)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
 func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
+	s.handleRules(s.Manager, w, r)
+}
+
+func (s *Server) handleRules(mgr Manager, w http.ResponseWriter, r *http.Request) {
+	if mgr == nil {
+		writeErr(w, http.StatusNotFound, "rules API disabled")
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
-		rules := s.Manager.Rules()
+		rules := mgr.Rules()
 		out := make([]map[string]string, 0, len(rules))
 		for _, rule := range rules {
 			out = append(out, map[string]string{
@@ -138,7 +164,7 @@ func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "invalid JSON")
 			return
 		}
-		rule, err := s.Manager.AddRule(r.Context(), body.Rule)
+		rule, err := mgr.AddRule(r.Context(), body.Rule)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
 			return
@@ -161,7 +187,7 @@ func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "rule is required")
 			return
 		}
-		ok, err := s.Manager.RemoveRule(r.Context(), raw)
+		ok, err := mgr.RemoveRule(r.Context(), raw)
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
 			return
@@ -183,7 +209,7 @@ func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
 		if body.Rules == nil {
 			body.Rules = []string{}
 		}
-		if err := s.Manager.SetRules(r.Context(), body.Rules); err != nil {
+		if err := mgr.SetRules(r.Context(), body.Rules); err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -195,17 +221,17 @@ func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleEffective(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleEffective(mgr Manager, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	nets := s.Manager.EffectiveBypassNets()
+	nets := mgr.EffectiveBypassNets()
 	strs := make([]string, 0, len(nets))
 	for _, n := range nets {
 		strs = append(strs, n.String())
 	}
-	resolved := s.Manager.ResolvedNets()
+	resolved := mgr.ResolvedNets()
 	rstrs := make([]string, 0, len(resolved))
 	for _, n := range resolved {
 		rstrs = append(rstrs, n.String())
@@ -213,16 +239,16 @@ func (s *Server) handleEffective(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"nets":      strs,
 		"resolved":  rstrs,
-		"dns_error": s.Manager.LastError(),
+		"dns_error": mgr.LastError(),
 	})
 }
 
-func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleApply(mgr Manager, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	err := s.Manager.Refresh(r.Context())
+	err := mgr.Refresh(r.Context())
 	// partial DNS failures still return 200 with dns_error
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,

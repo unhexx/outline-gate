@@ -57,6 +57,19 @@ func isDynamicKey(s string) bool {
 	return strings.HasPrefix(strings.TrimSpace(s), "ssconf://")
 }
 
+// AccessKeyEndpoint returns host:port from an ss:// or ssconf:// key (no userinfo).
+func AccessKeyEndpoint(accessKey string) string {
+	accessKey = strings.TrimSpace(accessKey)
+	if accessKey == "" {
+		return ""
+	}
+	u, err := url.Parse(accessKey)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}
+
 func expandDynamic(ctx context.Context, key string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(key))
 	if err != nil {

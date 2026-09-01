@@ -1,6 +1,6 @@
 # Развёртывание outline-gate на другом хосте
 
-**Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · эксплуатация: [OPERATIONS.ru.md](OPERATIONS.ru.md)
+**Релиз:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · эксплуатация: [OPERATIONS.ru.md](OPERATIONS.ru.md)
 
 | Ресурс | URL |
 |--------|-----|
@@ -35,6 +35,25 @@ L3-шлюз (host network):
 ```bash
 ./install.sh --host 'ss://YOUR_KEY_HERE'
 ```
+
+### Прокси и шлюз одновременно
+
+`./install.sh --host` — не «только L3». Тот же контейнер слушает SOCKS5 `:1080` и ставит nft-шлюз для LAN.
+
+```bash
+./install.sh --host 'ss://YOUR_KEY_HERE'
+```
+
+В `.env`: `COMPOSE_PROFILE=host`, `GATEWAY_ENABLE=true`. SOCKS не выключается.
+
+```bash
+# прокси (приложения на хосте / LAN)
+curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
+# шлюз: на клиенте default gateway = IP этого хоста
+# UI (UI_ENABLE=true): http://IP-ХОСТА:8080/ui/
+```
+
+Не поднимайте одновременно bridge- и host-compose: имя контейнера одно, порты пересекаются.
 
 Обновление на уже установленном хосте:
 
@@ -79,7 +98,7 @@ git pull
 
 1. Контейнер **outline-gate** (`ss://` / `ssconf://`).
 2. **SOCKS5** на `:1080` (bridge) или host network.
-3. Опционально **L3-шлюз** (`./install.sh --host`).
+3. **L3-шлюз вместе с SOCKS** (`./install.sh --host`): LAN default-GW + `:1080`.
 4. Опционально **Web UI** — после install: `UI_ENABLE=true` + `UI_TOKEN` в `.env`, затем `./install.sh --no-build`.
 
 Секреты **не** в git.
@@ -106,7 +125,7 @@ docker --version && docker compose version
 | Профиль | Compose | Команда |
 |---------|---------|---------|
 | **socks** (bridge) | `docker-compose.yml` | `./install.sh 'ss://...'` |
-| **host** (L3) | `docker-compose.host.yml` | `./install.sh --host 'ss://...'` |
+| **host** (SOCKS + L3) | `docker-compose.host.yml` | `./install.sh --host 'ss://...'` |
 
 ---
 
@@ -203,7 +222,7 @@ DHCP option 3 / static gateway на роутере — для всей сети.
 ```bash
 cd outline-gate
 git fetch --tags
-git checkout v0.4.0   # или git pull на master
+git checkout v0.6.0   # или git pull на master
 cd deploy/compose
 ./install.sh          # rebuild + recreate
 # .env и config/bypass.rules.txt сохраняются (volume / gitignore)
@@ -279,7 +298,7 @@ sudo nft delete table inet outline_gate
 - [ ] `git clone` + `./install.sh 'ss://...'`
 - [ ] `curl` `/readyz` + SOCKS `ifconfig.me`
 - [ ] Firewall: только LAN на 1080/UI
-- [ ] (опц.) `./install.sh --host` для L3
+- [ ] (опц.) `./install.sh --host` для SOCKS + L3
 - [ ] (опц.) бэкап `.env` + `config/bypass.rules.txt`
 
 ---

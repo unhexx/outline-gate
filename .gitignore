@@ -36,8 +36,9 @@ deploy/compose/.env
 deploy/compose/config/outline_key.runtime.txt
 **/outline_key.runtime.txt
 
-# Runtime bypass rules (UI/API); template is bypass.rules.example.txt
+# Runtime bypass/block rules (UI/API); templates are *.rules.example.txt
 deploy/compose/config/bypass.rules.txt
+deploy/compose/config/block.rules.txt
 deploy/compose/config/*.local.bak
 deploy/compose/config/*.bak
 

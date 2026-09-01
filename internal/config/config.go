@@ -65,6 +65,9 @@ type Config struct {
 	UIToken string
 	// BypassRulesFile is the path to user-managed bypass rules (IP/CIDR/domain).
 	BypassRulesFile string
+	// BlockRulesFile is the path to user-managed block rules (IP/CIDR/domain).
+	// Matching destinations are dropped (SOCKS + L3) and recorded in the connection log.
+	BlockRulesFile string
 	// BypassDNSRefresh is how often domain rules are re-resolved for L3.
 	BypassDNSRefresh time.Duration
 	// AccessKeyPersistFile is where the UI writes a replaced Outline key (survives restart).
@@ -75,6 +78,19 @@ type Config struct {
 	SOCKSAllowCIDRs []net.IPNet
 	// MetricsEnable exposes Prometheus text metrics at /metrics on HealthListen.
 	MetricsEnable bool
+
+	// SSConfRefresh is how often ssconf:// keys are re-fetched. 0 disables.
+	SSConfRefresh time.Duration
+	// ProbeAddr is host:port dialed through the Outline tunnel to verify it
+	// still works. Empty disables the periodic probe.
+	ProbeAddr string
+	// ProbeInterval is how often to run the tunnel probe.
+	ProbeInterval time.Duration
+	// ProbeTimeout is the per-probe dial deadline.
+	ProbeTimeout time.Duration
+	// ProbeFails is consecutive tunnel dial failures before Ready() flips false
+	// and MaintainReady rebuilds the dialer (re-expanding ssconf://).
+	ProbeFails int
 }
 
 // Load reads configuration from the process environment.
@@ -100,8 +116,14 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		TransproxyPort:       12345,
 		UIEnable:             false,
 		BypassRulesFile:      "/config/bypass.rules.txt",
+		BlockRulesFile:       "/config/block.rules.txt",
 		BypassDNSRefresh:     60 * time.Second,
 		AccessKeyPersistFile: "/config/outline_key.runtime.txt",
+		SSConfRefresh:        2 * time.Minute,
+		ProbeAddr:            "1.1.1.1:443",
+		ProbeInterval:        30 * time.Second,
+		ProbeTimeout:         8 * time.Second,
+		ProbeFails:           2,
 	}
 
 	key, err := loadAccessKey(getenv)
@@ -174,6 +196,9 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	if v := strings.TrimSpace(getenv("BYPASS_RULES_FILE")); v != "" {
 		cfg.BypassRulesFile = v
 	}
+	if v := strings.TrimSpace(getenv("BLOCK_RULES_FILE")); v != "" {
+		cfg.BlockRulesFile = v
+	}
 	if v := strings.TrimSpace(getenv("BYPASS_DNS_REFRESH")); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {
@@ -190,6 +215,37 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 			return nil, fmt.Errorf("METRICS_ENABLE: %w", err)
 		}
 		cfg.MetricsEnable = b
+	}
+	if v := strings.TrimSpace(getenv("SSCONF_REFRESH_INTERVAL")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("SSCONF_REFRESH_INTERVAL: %w", err)
+		}
+		cfg.SSConfRefresh = d
+	}
+	if v := strings.TrimSpace(getenv("TUNNEL_PROBE_ADDR")); v != "" {
+		cfg.ProbeAddr = parseProbeAddr(v)
+	}
+	if v := strings.TrimSpace(getenv("TUNNEL_PROBE_INTERVAL")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("TUNNEL_PROBE_INTERVAL: %w", err)
+		}
+		cfg.ProbeInterval = d
+	}
+	if v := strings.TrimSpace(getenv("TUNNEL_PROBE_TIMEOUT")); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("TUNNEL_PROBE_TIMEOUT: %w", err)
+		}
+		cfg.ProbeTimeout = d
+	}
+	if v := strings.TrimSpace(getenv("TUNNEL_PROBE_FAILS")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("TUNNEL_PROBE_FAILS: %w", err)
+		}
+		cfg.ProbeFails = n
 	}
 
 	bypass, err := loadCIDRs(getenv, "BYPASS_CIDRS", "BYPASS_CIDRS_FILE")
@@ -469,7 +525,36 @@ func (c *Config) Validate() error {
 	if c.BypassDNSRefresh <= 0 {
 		return fmt.Errorf("BYPASS_DNS_REFRESH must be positive")
 	}
+	if c.SSConfRefresh < 0 {
+		return fmt.Errorf("SSCONF_REFRESH_INTERVAL must be >= 0")
+	}
+	if c.ProbeAddr != "" {
+		if _, _, err := net.SplitHostPort(c.ProbeAddr); err != nil {
+			return fmt.Errorf("TUNNEL_PROBE_ADDR: %w", err)
+		}
+		if c.ProbeInterval <= 0 {
+			return fmt.Errorf("TUNNEL_PROBE_INTERVAL must be positive when probe is enabled")
+		}
+		if c.ProbeTimeout <= 0 {
+			return fmt.Errorf("TUNNEL_PROBE_TIMEOUT must be positive when probe is enabled")
+		}
+	}
+	if c.ProbeFails < 1 {
+		return fmt.Errorf("TUNNEL_PROBE_FAILS must be >= 1")
+	}
 	return nil
+}
+
+// parseProbeAddr maps disable sentinels to empty (probe off). Other values
+// are returned trimmed.
+func parseProbeAddr(v string) string {
+	v = strings.TrimSpace(v)
+	switch strings.ToLower(v) {
+	case "", "off", "none", "-", "false", "disable", "disabled":
+		return ""
+	default:
+		return v
+	}
 }
 
 // RedactAccessKey returns a safe-to-log form of the access key.

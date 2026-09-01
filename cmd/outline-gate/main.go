@@ -61,9 +61,15 @@ func run() error {
 	defer cancel()
 
 	client, err := outline.New(outline.Options{
-		AccessKey:     cfg.AccessKey,
-		ReconnectBase: cfg.ReconnectBase,
-		ReconnectMax:  cfg.ReconnectMax,
+		AccessKey:       cfg.AccessKey,
+		ReconnectBase:   cfg.ReconnectBase,
+		ReconnectMax:    cfg.ReconnectMax,
+		ProbeAddr:       cfg.ProbeAddr,
+		ProbeInterval:   cfg.ProbeInterval,
+		ProbeTimeout:    cfg.ProbeTimeout,
+		ProbeFails:      cfg.ProbeFails,
+		RefreshInterval: cfg.SSConfRefresh,
+		Logger:          log,
 	})
 	if err != nil {
 		return err
@@ -119,6 +125,15 @@ func run() error {
 		log.Warn("bypass rules load", "err", err)
 	}
 
+	blockMgr := bypass.NewManager(bypass.Options{
+		Store:        bypass.NewStore(cfg.BlockRulesFile),
+		Logger:       log,
+		RefreshEvery: cfg.BypassDNSRefresh,
+	})
+	if err := blockMgr.Load(ctx); err != nil {
+		log.Warn("block rules load", "err", err)
+	}
+
 	mu.Lock()
 	engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
 	if cfg.GatewayEnable {
@@ -145,6 +160,18 @@ func run() error {
 	if cfg.MetricsEnable {
 		met = metrics.New()
 	}
+	if met != nil {
+		client.OnProbe = func(ok bool) { met.ObserveProbe(ok) }
+		client.OnRefresh = func(err error, changed bool) { met.ObserveRefresh(err == nil, changed) }
+	}
+	if cfg.ProbeAddr != "" || cfg.SSConfRefresh > 0 {
+		log.Info("outline supervisor",
+			"probe", cfg.ProbeAddr,
+			"probe_interval", cfg.ProbeInterval,
+			"probe_fails", cfg.ProbeFails,
+			"ssconf_refresh", cfg.SSConfRefresh,
+		)
+	}
 	connHook := proxy.NewStoreHook(func(e proxy.ConnEvent) {
 		connStore.FromFields(e.Proto, e.ClientIP, e.Target, e.Host, e.Port, e.Via, e.Rule, e.OK, e.Error, e.DurationMs)
 		if met != nil {
@@ -160,6 +187,7 @@ func run() error {
 	if cfg.UIEnable {
 		ui := &webui.Server{
 			Manager: bypassMgr,
+			Block:   blockMgr,
 			Outline: &webui.ClientOutline{
 				Ready:     client.Ready,
 				ServerIP:  client.ServerIP,
@@ -219,6 +247,12 @@ func run() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		blockMgr.RunRefreshLoop(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
 				errCh <- fmt.Errorf("outline maintain: panic: %v", r)
@@ -236,6 +270,7 @@ func run() error {
 		ListenAddr: cfg.SOCKSListen,
 		Dialer:     client,
 		Bypass:     bypassMgr,
+		Block:      blockMgr,
 		AllowCIDRs: cfg.SOCKSAllowCIDRs,
 		ConnLog:    connHook,
 		Logger:     log,
@@ -257,6 +292,7 @@ func run() error {
 				Mu:     &mu,
 				Engine: func() *routing.Engine { return engine },
 				Bypass: bypassMgr,
+				Block:  blockMgr,
 			},
 			ConnLog: connHook,
 			Logger:  log,
@@ -360,6 +396,9 @@ func run() error {
 					if err := bypassMgr.Load(ctx); err != nil {
 						log.Error("bypass reload", "err", err)
 					}
+					if err := blockMgr.Load(ctx); err != nil {
+						log.Error("block reload", "err", err)
+					}
 					// Load triggers OnChange → rebuildPush, which refreshes engine + gateway
 					if wasActive {
 						if err := gw.Apply(); err != nil {
@@ -371,6 +410,9 @@ func run() error {
 					bypassMgr.SetStatic(cfg.BypassCIDRs)
 					if err := bypassMgr.Load(ctx); err != nil {
 						log.Error("bypass reload", "err", err)
+					}
+					if err := blockMgr.Load(ctx); err != nil {
+						log.Error("block reload", "err", err)
 					}
 				}
 			}

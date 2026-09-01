@@ -212,6 +212,139 @@ func TestSOCKS5RecordsConnLogWithRule(t *testing.T) {
 	}
 }
 
+func TestSOCKS5BlockRejectsAndLogs(t *testing.T) {
+	var tunnelHits atomic.Int32
+	tunnel := &recordingDialer{hits: &tunnelHits, addr: "127.0.0.1:9"}
+	log := &captureLog{}
+	s := &SOCKS5{
+		ListenAddr: "127.0.0.1:0",
+		Dialer:     tunnel,
+		Block:      hostBypass{"ads.example": true},
+		ConnLog:    log,
+		Timeout:    5 * time.Second,
+	}
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	s.ln = ln
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go s.handle(ctx, conn)
+		}
+	}()
+
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(c, resp); err != nil {
+		t.Fatal(err)
+	}
+	host := "ads.example"
+	req := []byte{0x05, 0x01, 0x00, 0x03, byte(len(host))}
+	req = append(req, host...)
+	req = append(req, 0x00, 0x50)
+	if _, err := c.Write(req); err != nil {
+		t.Fatal(err)
+	}
+	reply := make([]byte, 10)
+	if _, err := io.ReadFull(c, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply[1] != 0x02 {
+		t.Fatalf("socks status %d want 0x02 (not allowed)", reply[1])
+	}
+	if tunnelHits.Load() != 0 {
+		t.Fatalf("blocked dest must not dial, hits=%d", tunnelHits.Load())
+	}
+	if len(log.events) != 1 {
+		t.Fatalf("events=%+v", log.events)
+	}
+	e := log.events[0]
+	if e.Via != "drop" || e.OK || e.Error != "blocked" || e.Proto != "socks" || e.Host != "ads.example" {
+		t.Fatalf("%+v", e)
+	}
+}
+
+func TestSOCKS5BlockWinsOverBypass(t *testing.T) {
+	var tunnelHits, directHits atomic.Int32
+	tunnel := &recordingDialer{hits: &tunnelHits, addr: "127.0.0.1:9"}
+	direct := &recordingDialer{hits: &directHits, addr: "127.0.0.1:9"}
+	log := &captureLog{}
+	s := &SOCKS5{
+		ListenAddr:   "127.0.0.1:0",
+		Dialer:       tunnel,
+		DirectDialer: direct,
+		Bypass:       hostBypass{"ads.example": true},
+		Block:        hostBypass{"ads.example": true},
+		ConnLog:      log,
+		Timeout:      5 * time.Second,
+	}
+	ln, err := net.Listen("tcp", s.ListenAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	s.ln = ln
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go s.handle(ctx, conn)
+		}
+	}()
+
+	c, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatal(err)
+	}
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(c, resp); err != nil {
+		t.Fatal(err)
+	}
+	host := "ads.example"
+	req := []byte{0x05, 0x01, 0x00, 0x03, byte(len(host))}
+	req = append(req, host...)
+	req = append(req, 0x00, 0x50)
+	if _, err := c.Write(req); err != nil {
+		t.Fatal(err)
+	}
+	reply := make([]byte, 10)
+	if _, err := io.ReadFull(c, reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply[1] != 0x02 {
+		t.Fatalf("status %d", reply[1])
+	}
+	if tunnelHits.Load() != 0 || directHits.Load() != 0 {
+		t.Fatalf("block must win over bypass")
+	}
+	if len(log.events) != 1 || log.events[0].Via != "drop" {
+		t.Fatalf("%+v", log.events)
+	}
+}
+
 func TestSOCKS5StaticCIDRBypassUsesDirect(t *testing.T) {
 	bln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

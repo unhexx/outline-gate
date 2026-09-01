@@ -14,6 +14,14 @@
     effective: document.getElementById("effective"),
     refresh: document.getElementById("btn-refresh"),
     apply: document.getElementById("btn-apply"),
+    blockForm: document.getElementById("block-add-form"),
+    blockRuleInput: document.getElementById("block-rule-input"),
+    blockFormError: document.getElementById("block-form-error"),
+    blockRulesBody: document.getElementById("block-rules-body"),
+    blockStatus: document.getElementById("block-status"),
+    blockEffective: document.getElementById("block-effective"),
+    blockRefresh: document.getElementById("btn-block-refresh"),
+    blockApply: document.getElementById("btn-block-apply"),
     outlineStatus: document.getElementById("outline-status"),
     keyForm: document.getElementById("key-form"),
     accessKey: document.getElementById("access-key"),
@@ -238,7 +246,7 @@
 
   function viaLabel(via) {
     if (via === "direct") return "Direct";
-    if (via === "drop") return "Drop";
+    if (via === "drop") return "Блок";
     return "VPN";
   }
 
@@ -268,6 +276,7 @@
   function eventMatches(e) {
     if (filter === "vpn" && e.via !== "tunnel") return false;
     if (filter === "direct" && e.via !== "direct") return false;
+    if (filter === "drop" && e.via !== "drop") return false;
     if (filter === "socks" && e.proto !== "socks") return false;
     if (filter === "l3" && e.proto !== "l3") return false;
     if (search) {
@@ -476,11 +485,78 @@
     }
   }
 
+  function renderBlockRules(rules) {
+    if (!el.blockRulesBody) return;
+    if (!rules || !rules.length) {
+      el.blockRulesBody.innerHTML = '<tr><td colspan="3" class="muted">Список пуст</td></tr>';
+      return;
+    }
+    el.blockRulesBody.innerHTML = rules
+      .map(
+        (r) =>
+          `<tr>
+            <td><code>${escapeHtml(r.rule)}</code></td>
+            <td><span class="kind-badge">${escapeHtml(kindLabel(r.kind))}</span></td>
+            <td><button type="button" class="danger" data-rule="${escapeAttr(r.rule)}">Удалить</button></td>
+          </tr>`
+      )
+      .join("");
+    el.blockRulesBody.querySelectorAll("button[data-rule]").forEach((btn) => {
+      btn.addEventListener("click", () => removeBlockRule(btn.getAttribute("data-rule")));
+    });
+  }
+
+  function showBlockError(msg) {
+    if (!el.blockFormError) return;
+    el.blockFormError.hidden = !msg;
+    el.blockFormError.textContent = msg || "";
+  }
+
+  async function loadBlock() {
+    if (!el.blockStatus) return;
+    showBlockError("");
+    el.blockStatus.textContent = "Загрузка…";
+    try {
+      const list = await api("/api/v1/block");
+      renderBlockRules(list.rules || []);
+      const eff = await api("/api/v1/block/effective");
+      const lines = [];
+      if (eff.dns_error) lines.push("# DNS: " + eff.dns_error);
+      (eff.nets || []).forEach((n) => lines.push(n));
+      if (el.blockEffective) {
+        el.blockEffective.textContent = lines.length ? lines.join("\n") : "(пусто)";
+      }
+      el.blockStatus.textContent =
+        "Правил: " + (list.rules || []).length +
+        (eff.dns_error ? " · DNS: " + eff.dns_error : " · OK");
+      setAuthPill(true);
+    } catch (e) {
+      el.blockStatus.textContent = "Ошибка: " + e.message + (e.status === 401 ? " (проверьте токен)" : "");
+      if (e.status === 401) {
+        setAuthPill(false);
+        if (el.blockRulesBody) {
+          el.blockRulesBody.innerHTML = '<tr><td colspan="3" class="muted">Требуется токен</td></tr>';
+        }
+      }
+    }
+  }
+
   async function loadAll() {
     await loadStatus();
     await loadOutline();
     await loadBypass();
+    await loadBlock();
     connectStream();
+  }
+
+  async function removeBlockRule(rule) {
+    if (!confirm("Разблокировать " + rule + "?")) return;
+    try {
+      await api("/api/v1/block?rule=" + encodeURIComponent(rule), { method: "DELETE" });
+      await loadBlock();
+    } catch (e) {
+      showBlockError(e.message);
+    }
   }
 
   async function removeRule(rule) {
@@ -515,6 +591,35 @@
       showError(e.message);
     }
   });
+  if (el.blockRefresh) el.blockRefresh.addEventListener("click", loadBlock);
+  if (el.blockApply) {
+    el.blockApply.addEventListener("click", async () => {
+      try {
+        await api("/api/v1/block/apply", { method: "POST" });
+        await loadBlock();
+      } catch (e) {
+        showBlockError(e.message);
+      }
+    });
+  }
+  if (el.blockForm) {
+    el.blockForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      showBlockError("");
+      const rule = el.blockRuleInput.value.trim();
+      if (!rule) return;
+      try {
+        await api("/api/v1/block", {
+          method: "POST",
+          body: JSON.stringify({ rule }),
+        });
+        el.blockRuleInput.value = "";
+        await loadBlock();
+      } catch (e) {
+        showBlockError(e.message);
+      }
+    });
+  }
   el.form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     showError("");

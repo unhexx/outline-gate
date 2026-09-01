@@ -3,7 +3,7 @@
 BINARY  ?= outline-gate
 CMD     ?= ./cmd/outline-gate
 IMAGE   ?= outline-gate:local
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo 0.4.0)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo 0.6.0)
 LDFLAGS ?= -s -w -X github.com/unhexx/outline-gate/internal/version.Version=$(VERSION)
 COMPOSE_DIR ?= deploy/compose
 

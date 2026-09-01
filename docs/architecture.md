@@ -1,6 +1,6 @@
 # Architecture
 
-**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · diagrams: [docs/images/](images/)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · diagrams: [docs/images/](images/)
 
 ```
 LAN clients ──► outline-gate ──ss:// / ssconf://──► Outline Server
@@ -20,12 +20,12 @@ See also: [architecture-overview.svg](images/architecture-overview.svg).
 |---------|------|
 | `cmd/outline-gate` | Lifecycle, signals, wiring |
 | `internal/config` | Env, CIDR files, UI flags, key persist path |
-| `internal/outline` | outline-sdk StreamDialer, server IP, reconnect, `SetAccessKey` |
+| `internal/outline` | outline-sdk StreamDialer, server IP, reconnect, `SetAccessKey`, ssconf refresh, tunnel probe |
 | `internal/proxy` | SOCKS5 + transparent TCP (`SO_ORIGINAL_DST`); SOCKS direct on bypass; connection hooks |
 | `internal/connlog` | In-memory ring buffer of routing events for live UI log |
 | `internal/routing` | Pure decision engine (IP sets) |
 | `internal/gateway` | nftables apply/flush |
-| `internal/bypass` | User rules (IP/CIDR/domain/`*.suffix`), store, DNS refresh, matcher |
+| `internal/bypass` | User rules (IP/CIDR/domain/`*.suffix`), store, DNS refresh, matcher (bypass and block lists) |
 | `internal/webui` | Embedded UI `/ui/` + API `/api/v1/*` (bypass, outline, connections, status) |
 | `internal/health` | `/healthz`, `/readyz` |
 | `internal/logging` | slog setup |
@@ -37,19 +37,20 @@ See also: [architecture-overview.svg](images/architecture-overview.svg).
 3. Transparent proxy reads `SO_ORIGINAL_DST` and uses `routing.Engine`:
    - **tunnel** → Outline dialer  
    - **direct** → local `net.Dialer` (user bypass, Outline server IP, include residual)  
-   - **drop** → close (include + `DIRECT_POLICY=drop`)
+   - **drop** → close (user block list, or include + `DIRECT_POLICY=drop`)
 4. Each attempt is recorded in `connlog` (`via=tunnel|direct|drop`).
 5. `postrouting` MASQUERADE rewrites source for return path.
 
-UDP is not fully handled in v0.4.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
+UDP is not fully handled in v0.6.0 (TCP-first). Use SOCKS5 for apps that need full proxy semantics without L3.
 
 ## Data path (SOCKS5)
 
 1. Client CONNECT to `host:1080` (no SOCKS auth).
-2. If host/IP matches bypass rules → **direct** `net.Dialer`.
-3. Else → Outline dialer.
-4. Domain rules match CONNECT hostname exactly (including `*.suffix`).
-5. Each CONNECT is recorded in `connlog` (`via=tunnel|direct`, optional matched rule).
+2. If host/IP matches **block** rules → close (`via=drop`, SOCKS `0x02`).
+3. Else if host/IP matches bypass rules → **direct** `net.Dialer`.
+4. Else → Outline dialer.
+5. Domain rules match CONNECT hostname exactly (including `*.suffix`).
+6. Each CONNECT is recorded in `connlog` (`via=tunnel|direct|drop`, optional matched rule).
 
 ## Connection log (Web UI)
 
@@ -62,7 +63,7 @@ UDP is not fully handled in v0.4.0 (TCP-first). Use SOCKS5 for apps that need fu
 ## Config reload
 
 - **SIGHUP** — re-read env/files, rebuild routing engine and nft sets.
-- **Web UI** — mutates `BYPASS_RULES_FILE` and `OUTLINE_KEY_PERSIST_FILE` live; DNS refresh on interval / apply.
+- **Web UI** — mutates `BYPASS_RULES_FILE`, `BLOCK_RULES_FILE` and `OUTLINE_KEY_PERSIST_FILE` live; DNS refresh on interval / apply.
 
 ## Security surfaces
 

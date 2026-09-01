@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadFromEnv_MinimalExclude(t *testing.T) {
@@ -24,6 +25,9 @@ func TestLoadFromEnv_MinimalExclude(t *testing.T) {
 	}
 	if cfg.GatewayEnable {
 		t.Fatal("gateway should default false (SOCKS-only until explicitly enabled)")
+	}
+	if cfg.BlockRulesFile != "/config/block.rules.txt" {
+		t.Fatalf("BlockRulesFile default: %s", cfg.BlockRulesFile)
 	}
 }
 
@@ -158,6 +162,71 @@ func TestLoadFromEnv_UIRequiresToken(t *testing.T) {
 	}
 	if !cfg.UIEnable || cfg.UIToken != "s3cret" {
 		t.Fatalf("%+v", cfg)
+	}
+}
+
+func TestLoadFromEnv_ProbeAndRefreshDefaults(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SSConfRefresh != 2*60*1e9 && cfg.SSConfRefresh != 2*time.Minute {
+		t.Fatalf("SSConfRefresh default: %s", cfg.SSConfRefresh)
+	}
+	if cfg.ProbeAddr != "1.1.1.1:443" {
+		t.Fatalf("ProbeAddr default: %q", cfg.ProbeAddr)
+	}
+	if cfg.ProbeInterval != 30*time.Second || cfg.ProbeTimeout != 8*time.Second || cfg.ProbeFails != 2 {
+		t.Fatalf("probe defaults: interval=%s timeout=%s fails=%d", cfg.ProbeInterval, cfg.ProbeTimeout, cfg.ProbeFails)
+	}
+}
+
+func TestLoadFromEnv_ProbeOffAndRefreshZero(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY":      "ss://x@1.1.1.1:1",
+		"TUNNEL_PROBE_ADDR":       "off",
+		"SSCONF_REFRESH_INTERVAL": "0s",
+		"TUNNEL_PROBE_INTERVAL":   "15s",
+		"TUNNEL_PROBE_TIMEOUT":    "3s",
+		"TUNNEL_PROBE_FAILS":      "4",
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ProbeAddr != "" {
+		t.Fatalf("probe should be off, got %q", cfg.ProbeAddr)
+	}
+	if cfg.SSConfRefresh != 0 {
+		t.Fatalf("refresh: %s", cfg.SSConfRefresh)
+	}
+	if cfg.ProbeFails != 4 || cfg.ProbeInterval != 15*time.Second || cfg.ProbeTimeout != 3*time.Second {
+		t.Fatalf("overrides: %+v", cfg)
+	}
+}
+
+func TestLoadFromEnv_InvalidProbeAddr(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"TUNNEL_PROBE_ADDR":  "not-a-host-port",
+	}
+	_, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err == nil {
+		t.Fatal("expected TUNNEL_PROBE_ADDR error")
+	}
+}
+
+func TestLoadFromEnv_InvalidProbeFails(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"TUNNEL_PROBE_FAILS": "0",
+	}
+	_, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err == nil {
+		t.Fatal("expected TUNNEL_PROBE_FAILS error")
 	}
 }
 

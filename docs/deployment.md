@@ -1,6 +1,6 @@
 # Deployment
 
-**Version:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md) · new-host steps (RU): [DEPLOY.ru.md](DEPLOY.ru.md)
+**Version:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · full guide (RU): [OPERATIONS.ru.md](OPERATIONS.ru.md) · new-host steps (RU): [DEPLOY.ru.md](DEPLOY.ru.md)
 
 One-shot on a fresh host (after clone):
 
@@ -92,18 +92,18 @@ curl -s http://127.0.0.1:28080/readyz
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
-cd outline-gate && git checkout v0.4.0
-docker build -f deploy/docker/Dockerfile -t outline-gate:v0.4.0 .
+cd outline-gate && git checkout v0.6.0
+docker build -f deploy/docker/Dockerfile -t outline-gate:v0.6.0 .
 ```
 
 Binary (no Docker):
 
 ```text
-https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
+https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64
 ```
 
 ## Firewall
 
 - Restrict `:1080` to LAN if exposed
-- Do not publish SOCKS to the public Internet without auth (v0.4.0 has no SOCKS auth)
+- Do not publish SOCKS to the public Internet without auth (v0.6.0 has no SOCKS auth)
 - Restrict health/UI port when `UI_ENABLE=true`; protect with strong `UI_TOKEN` (+ reverse-proxy TLS if exposed beyond LAN)

@@ -1,0 +1,8 @@
+# outline-gate destination block list (managed by UI/API)
+# Copy to block.rules.txt. Matching hosts/IPs are dropped (not tunneled, not direct).
+# Syntax: IP, CIDR, exact domain, or *.suffix
+#
+# 203.0.113.10
+# 198.51.100.0/24
+# tracker.example.com
+# *.ads.example

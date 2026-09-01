@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -125,6 +126,50 @@ func TestAPIAuthAndCRUD(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ui/", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("ui: %d", rr.Code)
+	}
+}
+
+func TestBlockAPI(t *testing.T) {
+	dir := t.TempDir()
+	store := bypass.NewStore(filepath.Join(dir, "block.txt"))
+	mgr := bypass.NewManager(bypass.Options{Store: store})
+	srv := &Server{Block: mgr, Token: "secret"}
+	mux := http.NewServeMux()
+	srv.Mount(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/block", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", rr.Code)
+	}
+
+	body := bytes.NewBufferString(`{"rule":"*.ads.example"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/block", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", rr.Code, rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/block", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatal(rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "*.ads.example") {
+		t.Fatalf("list: %s", rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/block?rule="+url.QueryEscape("*.ads.example"), nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("delete: %d %s", rr.Code, rr.Body.String())
 	}
 }
 

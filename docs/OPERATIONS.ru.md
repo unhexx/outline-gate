@@ -1,6 +1,6 @@
 # outline-gate — пошаговая инструкция по развёртыванию и эксплуатации
 
-**Релиз:** [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
+**Релиз:** [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) · [CHANGELOG](../CHANGELOG.md) · [README](../README.md)
 
 > **Быстрый деплой на новый хост:** см. отдельную инструкцию **[DEPLOY.ru.md](DEPLOY.ru.md)**  
 > (`configure.sh` → `install.sh` → проверка). Этот документ — полный справочник.
@@ -48,19 +48,19 @@
 # GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
+git checkout v0.6.0
 
 # или aservice
 git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
+git checkout v0.6.0
 ```
 
 Бинарник Linux amd64 (без Docker):
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64
 chmod +x outline-gate
 ```
 
@@ -164,7 +164,7 @@ docker run --rm -d --name outline-gate \
   -e LOG_LEVEL=info \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
-  outline-gate:v0.4.0
+  outline-gate:v0.6.0
 ```
 
 Доп. параметры — любыми `-e ИМЯ=значение` (см. таблицу).
@@ -224,7 +224,33 @@ Windows/macOS/роутер: укажите default gateway / DHCP option 3.
 
 **Важно:** на bridge-сети Docker контейнер **не** становится LAN-gateway «из коробки». Для L3 используйте host (или macvlan — см. `docs/deployment.md`).
 
-### 6.3. Остановка и очистка
+SOCKS5 при `--host` **не отключается**: тот же процесс слушает `:1080`. Это и есть режим «прокси и шлюз одновременно» (см. [README § быстрый старт](../README.md#прокси-и-шлюз-одновременно)).
+
+### 6.3. Прокси и шлюз одновременно
+
+Один контейнер, host-сеть, оба слушателя.
+
+```bash
+# в .env:
+#   COMPOSE_PROFILE=host
+#   GATEWAY_ENABLE=true
+#   SOCKS_LISTEN=0.0.0.0:1080
+#   HEALTH_LISTEN=0.0.0.0:8080
+#   UI_ENABLE=true
+#   UI_TOKEN=...
+
+./install.sh --host
+```
+
+| Клиент | Как ходит |
+|--------|-----------|
+| Приложение с SOCKS | `HOST:1080` (`socks5h`) |
+| Устройство LAN без proxy | default gateway = IP хоста |
+| Web UI | `http://HOST:8080/ui/` |
+
+Не запускайте `docker-compose.yml` параллельно с host-профилем.
+
+### 6.4. Остановка и очистка
 
 ```bash
 cd deploy/compose
@@ -252,6 +278,7 @@ sudo nft delete table inet outline_gate   # если осталась
 | `BYPASS_CIDRS` | нет | — | Статические CIDR-исключения, CSV |
 | `BYPASS_CIDRS_FILE` | нет | `/config/bypass.txt` | Файл CIDR (по строке) |
 | `BYPASS_RULES_FILE` | нет | `/config/bypass.rules.txt` | User-правила UI: IP/CIDR/домены/`*.mask` |
+| `BLOCK_RULES_FILE` | нет | `/config/block.rules.txt` | Блок-лист: те же типы правил; drop + лог |
 | `BYPASS_DNS_REFRESH` | нет | `60s` | Период DNS-резолва доменов для L3 |
 | `UI_ENABLE` | нет | `false` | Web UI `/ui/` и API |
 | `UI_TOKEN` | при UI | — | Токен (Bearer или Basic password) |
@@ -272,6 +299,11 @@ sudo nft delete table inet outline_gate   # если осталась
 | `LOG_FORMAT` | нет | `text` | text/json |
 | `RECONNECT_BASE_DELAY` | нет | `1s` | backoff |
 | `RECONNECT_MAX_DELAY` | нет | `60s` | cap backoff |
+| `SSCONF_REFRESH_INTERVAL` | нет | `2m` | перечитать `ssconf://`; `0` = выкл. |
+| `TUNNEL_PROBE_ADDR` | нет | `1.1.1.1:443` | TCP-probe через туннель; `off`/`none`/`-` = выкл. |
+| `TUNNEL_PROBE_INTERVAL` | нет | `30s` | период probe |
+| `TUNNEL_PROBE_TIMEOUT` | нет | `8s` | дедлайн одного probe |
+| `TUNNEL_PROBE_FAILS` | нет | `2` | подряд фейлы → `Ready=false` + пересборка dialer |
 | `HOST_SOCKS_PORT` | нет | `1080` | publish на хосте |
 | `HOST_HEALTH_PORT` | нет | `28080` (example) | publish health/UI на хосте |
 | `COMPOSE_PROFILE` | нет | `socks` | `socks` \| `host` — выбор файла для `install.sh` |
@@ -315,6 +347,7 @@ http://IP-хоста:28080/ui/
 
 1. **Ключ Outline** — вставка `ss://` / `ssconf://`, «Заменить ключ» (reconnect + запись в `OUTLINE_KEY_PERSIST_FILE`).
 2. **Bypass** — IP / CIDR / домен / `*.suffix`.
+3. **Блок** — те же типы правил; совпадения не идут ни в VPN, ни напрямую. В **Логе** фильтр «Блок».
 
 | Пример bypass | Значение |
 |---------------|----------|
@@ -378,6 +411,19 @@ curl -s -X DELETE "${AUTH[@]}" -H 'Content-Type: application/json' \
   -d '{"rule":"*.example.com"}' \
   "http://127.0.0.1:${PORT}/api/v1/bypass"
 ```
+
+**Блок-лист** (тот же синтаксис; `via=drop` в логе):
+
+```bash
+curl -s "${AUTH[@]}" "http://127.0.0.1:${PORT}/api/v1/block"
+curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"*.ads.example"}' \
+  "http://127.0.0.1:${PORT}/api/v1/block"
+curl -s -X DELETE "${AUTH[@]}" \
+  "http://127.0.0.1:${PORT}/api/v1/block?rule=*.ads.example"
+```
+
+Приоритет: **блок > bypass > VPN**. SOCKS отвечает `0x02` (not allowed by ruleset).
 
 **Применить DNS-резолв сразу** (L3-сеты после смены доменов)
 
@@ -465,7 +511,7 @@ SIGHUP перечитывает env **процесса** (не обязател�
 ```bash
 cd outline-gate
 git fetch --tags
-git checkout v0.4.0   # или: git pull
+git checkout v0.6.0   # или: git pull
 cd deploy/compose
 ./install.sh
 ```
@@ -496,6 +542,7 @@ cd deploy/compose
 | `missing access key` | `.env` / файл ключа; `configure.sh` |
 | `/readyz` 503 | ключ, сеть до Outline, логи `docker compose logs` |
 | SOCKS timeout | firewall, `ROUTING_MODE`, жив ли Outline server |
+| `/readyz` 200, SOCKS timeout | раньше — застрявший `ssconf://` (dialer не перечитывался). Смотрите `ssconf endpoint changed` / `tunnel probe failed`; процесс сам refresh/probe |
 | L3 не работает | host profile? `GATEWAY_ENABLE=true`? default GW на клиентах? |
 | Остались nft rules | `sudo nft delete table inet outline_gate` |
 | Routing loop | IP сервера Outline должен быть в bypass (добавляется автоматически) |

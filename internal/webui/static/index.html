@@ -45,6 +45,9 @@
       <button type="button" class="tab" role="tab" aria-selected="false" data-tab="bypass" id="tab-bypass">
         <img class="ico" src="icons/bypass.svg" alt="" width="14" height="14" /> Bypass
       </button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="block" id="tab-block">
+        <img class="ico" src="icons/drop.svg" alt="" width="14" height="14" /> Блок
+      </button>
       <button type="button" class="tab" role="tab" aria-selected="false" data-tab="key" id="tab-key">
         <img class="ico" src="icons/key.svg" alt="" width="14" height="14" /> Ключ
       </button>
@@ -82,11 +85,12 @@
             <button type="button" class="chip active" data-filter="all">Все</button>
             <button type="button" class="chip" data-filter="vpn"><img class="ico" src="icons/vpn.svg" alt="" width="11" height="11" /> VPN</button>
             <button type="button" class="chip" data-filter="direct"><img class="ico" src="icons/direct.svg" alt="" width="11" height="11" /> Direct</button>
+            <button type="button" class="chip" data-filter="drop"><img class="ico" src="icons/drop.svg" alt="" width="11" height="11" /> Блок</button>
             <button type="button" class="chip" data-filter="socks">SOCKS</button>
             <button type="button" class="chip" data-filter="l3">L3</button>
             <input id="log-search" type="search" placeholder="host…" class="search" />
           </div>
-          <p class="disclaimer">Internet TCP (SOCKS + L3): VPN / Direct / Drop. RFC1918 на L3 — kernel, без записи.</p>
+          <p class="disclaimer">Internet TCP (SOCKS + L3): VPN / Direct / Блок. RFC1918 на L3 — kernel, без записи.</p>
           <div id="log-list" class="log-list" aria-live="polite" aria-relevant="additions">
             <p class="empty muted" id="log-empty">Нет подключений — SOCKS или L3 traffic.</p>
           </div>
@@ -119,6 +123,36 @@
         <div class="card">
           <h2>Эффективный bypass (IP)</h2>
           <pre id="effective" class="code">—</pre>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-block" role="tabpanel" aria-labelledby="tab-block" hidden>
+        <div class="card">
+          <h2>Правило блокировки</h2>
+          <form id="block-add-form" class="row">
+            <input id="block-rule-input" type="text" placeholder="IP / CIDR / domain / *.mask" required />
+            <button type="submit">+</button>
+          </form>
+          <p id="block-form-error" class="error" hidden></p>
+          <p class="hint">Совпадения не идут ни в VPN, ни напрямую — соединение закрывается. Блок важнее bypass.</p>
+        </div>
+        <div class="card">
+          <div class="row between tight">
+            <h2>Список блокировок</h2>
+            <div class="row tight">
+              <button type="button" id="btn-block-refresh" class="ghost sm">↻</button>
+              <button type="button" id="btn-block-apply" class="ghost sm">DNS</button>
+            </div>
+          </div>
+          <p id="block-status" class="muted sm"></p>
+          <table>
+            <thead><tr><th>Правило</th><th>Тип</th><th></th></tr></thead>
+            <tbody id="block-rules-body"><tr><td colspan="3" class="muted">…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>Эффективный блок (IP)</h2>
+          <pre id="block-effective" class="code">—</pre>
         </div>
       </section>
 

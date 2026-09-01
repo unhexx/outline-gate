@@ -1,27 +1,50 @@
 # outline-gate
 
-[![CI](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/unhexx/outline-gate/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver)](https://github.com/unhexx/outline-gate/releases/latest)
-[![GitHub release date](https://img.shields.io/github/release-date/unhexx/outline-gate)](https://github.com/unhexx/outline-gate/releases/latest)
-[![Version](https://img.shields.io/badge/version-v0.4.0-blue)](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)
-[![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](go.mod)
-[![Go Reference](https://pkg.go.dev/badge/github.com/unhexx/outline-gate.svg)](https://pkg.go.dev/github.com/unhexx/outline-gate)
-[![JavaScript](https://img.shields.io/badge/JavaScript-ES2020%20vanilla-F7DF1E?logo=javascript&logoColor=black)](#web-ui)
-[![HTML5](https://img.shields.io/badge/HTML5-UI-E34F26?logo=html5&logoColor=white)](#web-ui)
-[![CSS3](https://img.shields.io/badge/CSS3-UI-1572B6?logo=css3&logoColor=white)](#web-ui)
-[![Docker](https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white)](#сборка-образа)
-[![Alpine](https://img.shields.io/badge/Alpine-3.21-0D597F?logo=alpinelinux&logoColor=white)](deploy/docker/Dockerfile)
-[![nftables](https://img.shields.io/badge/nftables-L3-orange)](docs/routing.md)
-[![SOCKS5](https://img.shields.io/badge/SOCKS5-proxy-lightgrey)](#использование-socks5)
-[![Outline](https://img.shields.io/badge/Outline-Shadowsocks-3dd68c)](https://getoutline.org/)
-[![Web UI](https://img.shields.io/badge/Web_UI-live_log-3d8bfd)](#web-ui)
-[![L3](https://img.shields.io/badge/L3-userspace_routing-3dd68c)](docs/routing.md)
-[![Metrics](https://img.shields.io/badge/metrics-/metrics-orange)](#prometheus-metrics)
-[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-informational)](#сборка-образа)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Module](https://img.shields.io/badge/module-unhexx%2Foutline--gate-informational)](go.mod)
+<p align="center">
+  <a href="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml"><img src="https://github.com/unhexx/outline-gate/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="https://github.com/unhexx/outline-gate/releases/latest"><img src="https://img.shields.io/github/v/release/unhexx/outline-gate?display_name=tag&sort=semver" alt="Release"></a>
+  <a href="https://github.com/unhexx/outline-gate/releases/latest"><img src="https://img.shields.io/github/release-date/unhexx/outline-gate" alt="Release date"></a>
+  <a href="https://github.com/unhexx/outline-gate/releases/tag/v0.6.0"><img src="https://img.shields.io/badge/version-v0.6.0-blue" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://semver.org/"><img src="https://img.shields.io/badge/semver-2.0.0-informational" alt="SemVer"></a>
+</p>
+<p align="center">
+  <a href="go.mod"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://pkg.go.dev/github.com/unhexx/outline-gate"><img src="https://pkg.go.dev/badge/github.com/unhexx/outline-gate.svg" alt="Go Reference"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/module-unhexx%2Foutline--gate-informational" alt="Go module"></a>
+  <a href="#web-ui"><img src="https://img.shields.io/badge/JavaScript-ES2020%20vanilla-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript"></a>
+  <a href="#web-ui"><img src="https://img.shields.io/badge/HTML5-UI-E34F26?logo=html5&logoColor=white" alt="HTML5"></a>
+  <a href="#web-ui"><img src="https://img.shields.io/badge/CSS3-UI-1572B6?logo=css3&logoColor=white" alt="CSS3"></a>
+  <a href="https://www.gnu.org/software/bash/"><img src="https://img.shields.io/badge/Bash-install%20%2F%20entrypoint-4EAA25?logo=gnubash&logoColor=white" alt="Bash"></a>
+  <a href="https://yaml.org/"><img src="https://img.shields.io/badge/YAML-Compose-cb171e?logo=yaml&logoColor=white" alt="YAML"></a>
+</p>
+<p align="center">
+  <a href="#сборка-образа"><img src="https://img.shields.io/badge/Linux-amd64-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
+  <a href="#сборка-образа"><img src="https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="deploy/compose/docker-compose.yml"><img src="https://img.shields.io/badge/Compose-v2-2496ED?logo=docker&logoColor=white" alt="Docker Compose"></a>
+  <a href="deploy/docker/Dockerfile"><img src="https://img.shields.io/badge/Alpine-3.21-0D597F?logo=alpinelinux&logoColor=white" alt="Alpine"></a>
+  <a href="Makefile"><img src="https://img.shields.io/badge/Make-build-brightgreen?logo=cmake&logoColor=white" alt="Make"></a>
+  <a href="https://github.com/unhexx/outline-gate/actions"><img src="https://img.shields.io/badge/GitHub_Actions-CI-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
+</p>
+<p align="center">
+  <a href="#использование-socks5"><img src="https://img.shields.io/badge/SOCKS5-RFC1928-lightgrey" alt="SOCKS5"></a>
+  <a href="https://getoutline.org/"><img src="https://img.shields.io/badge/Outline-client-3dd68c" alt="Outline"></a>
+  <a href="https://shadowsocks.org/"><img src="https://img.shields.io/badge/Shadowsocks-ss%20%2F%20ssconf-2B2B2B" alt="Shadowsocks"></a>
+  <a href="https://golang.getoutline.org/sdk"><img src="https://img.shields.io/badge/outline--sdk-transport-3dd68c" alt="outline-sdk"></a>
+  <a href="docs/routing.md"><img src="https://img.shields.io/badge/nftables-L3-orange" alt="nftables"></a>
+  <a href="docs/routing.md"><img src="https://img.shields.io/badge/L3-userspace_routing-3dd68c" alt="L3"></a>
+  <a href="docs/routing.md"><img src="https://img.shields.io/badge/TCP-IPv4_first-informational" alt="TCP IPv4"></a>
+  <a href="docs/routing.md"><img src="https://img.shields.io/badge/split--tunnel-exclude%20%7C%20include-blue" alt="split-tunnel"></a>
+</p>
+<p align="center">
+  <a href="#web-ui"><img src="https://img.shields.io/badge/Web_UI-live_log-3d8bfd" alt="Web UI"></a>
+  <a href="#web-ui"><img src="https://img.shields.io/badge/REST-JSON_API-0F4C81" alt="REST JSON API"></a>
+  <a href="#web-ui"><img src="https://img.shields.io/badge/SSE-EventSource-3d8bfd" alt="SSE"></a>
+  <a href="#prometheus-metrics"><img src="https://img.shields.io/badge/Prometheus-/metrics-E6522C?logo=prometheus&logoColor=white" alt="Prometheus"></a>
+  <a href="docs/OPERATIONS.ru.md"><img src="https://img.shields.io/badge/health-/readyz-success" alt="health"></a>
+</p>
 
-**Current release: [v0.4.0](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64)
+**Current release: [v0.6.0](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -45,9 +68,10 @@
 | **Не ломать локальную сеть и банки / внутренние API** | Always-bypass частных сетей + UI/API-список исключений |
 | **Сменить Outline-ключ без деплоя** | Web UI / `PUT /api/v1/outline` → reconnect + persist-файл |
 | **Быстро добавить «не гонять через VPN»** | Web UI: IP, подсеть, `example.com`, `*.cdn.example.net` |
+| **Заблокировать домены / адреса / маски** | Вкладка **Блок**; совпадения в логе как «Блок» |
 | **Проверить, что туннель жив** | `/readyz`, healthcheck Docker, egress-check через SOCKS |
 | **Единый сервис вместо зоопарка клиентов** | Compose + `.env` / secrets; ключ не вшит в образ |
-| **Динамический ключ провайдера** | Поддержка `ssconf://` (раскрытие при Connect) |
+| **Динамический ключ провайдера** | `ssconf://` раскрывается при Connect и периодически перечитывается; TCP-probe туннеля сбрасывает застрявший dialer |
 
 ### Для кого
 
@@ -58,7 +82,7 @@
 ### Чем не является
 
 - Не **Outline Server / Manager** — только **клиент** к уже выданному ключу.
-- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.4 — TCP-first; IPv6 L3 nft — gap).
+- Не полноценный **DNS-over-VPN** и не полный **UDP/L3** (v0.6 — TCP-first; IPv6 L3 nft — gap).
 - Не multi-user IdP: Web UI защищается **одним `UI_TOKEN`**, SOCKS **без пароля** (LAN + опционально `SOCKS_ALLOW_CIDRS`).
 
 <p align="center">
@@ -78,15 +102,17 @@
 
 1. [О продукте](#о-продукте)
 2. [Быстрый старт](#быстрый-старт)
-3. [Релиз и установка](#релиз-и-установка)
-4. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
-5. [Использование SOCKS5](#использование-socks5)
-6. [Использование L3 gateway](#использование-l3-gateway)
-7. [Web UI](#web-ui)
-8. [Переменные окружения](#основные-переменные)
-9. [Сборка образа](#сборка-образа)
-10. [Best practices](#best-practices)
-11. [Документация](#документация)
+   - [Прокси и шлюз одновременно](#прокси-и-шлюз-одновременно)
+3. [Проверка подключения](#проверка-подключения)
+4. [Релиз и установка](#релиз-и-установка)
+5. [SOCKS5 vs L3 — что выбрать](#socks5-vs-l3--что-выбрать)
+6. [Использование SOCKS5](#использование-socks5)
+7. [Использование L3 gateway](#использование-l3-gateway)
+8. [Web UI](#web-ui)
+9. [Переменные окружения](#основные-переменные)
+10. [Сборка образа](#сборка-образа)
+11. [Best practices](#best-practices)
+12. [Документация](#документация)
 
 ---
 
@@ -100,17 +126,104 @@ cd outline-gate
 ./install.sh 'ss://YOUR_OUTLINE_KEY'
 
 curl -s http://127.0.0.1:28080/readyz
-curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
+# затем — [проверка подключения](#проверка-подключения)
 ```
 
-L3-шлюз (host network):
+L3-шлюз (host network; **SOCKS5 тоже слушается**):
 
 ```bash
 ./install.sh --host 'ss://YOUR_OUTLINE_KEY'
 ```
 
+### Прокси и шлюз одновременно
+
+`--host` поднимает **один** процесс с обоими режимами: SOCKS5 для приложений и L3-шлюз для LAN. Отдельный контейнер под прокси не нужен.
+
+```bash
+./install.sh --host 'ss://YOUR_OUTLINE_KEY'
+```
+
+`deploy/compose/.env`:
+
+```bash
+COMPOSE_PROFILE=host
+GATEWAY_ENABLE=true
+SOCKS_LISTEN=0.0.0.0:1080
+HEALTH_LISTEN=0.0.0.0:8080    # health + Web UI (host network)
+UI_ENABLE=true
+UI_TOKEN=ваш-секрет
+```
+
+| Что | Куда |
+|-----|------|
+| SOCKS5 | `HOST:1080` — браузер, curl, Git ([использование SOCKS5](#использование-socks5)) |
+| L3 gateway | default gateway клиентов = IP хоста ([использование L3](#использование-l3-gateway)) |
+| Web UI / health | `http://HOST:8080/ui/` (порт = `HEALTH_LISTEN`) |
+
+Проверка:
+
+```bash
+curl -s http://127.0.0.1:8080/readyz
+curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me
+# затем — [проверка подключения](#проверка-подключения)
+```
+
+Не запускайте рядом `docker-compose.yml` и `docker-compose.host.yml`: контейнер один (`outline-gate`), порты 1080 и health пересекаются.  
+Bridge-профиль (`GATEWAY_ENABLE=true` без host-сети) не станет LAN-шлюзом «из коробки».
+
 Bridge-сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM; не расходует Docker `default-address-pools`).  
 Пример daemon: [`deploy/docker/daemon.json.example`](deploy/docker/daemon.json.example).
+
+---
+
+## Проверка подключения
+
+На профиле **SOCKS-only** (`GATEWAY_ENABLE=false`) хост **не** маршрутизирует трафик в туннель сам. В VPN попадает только клиент, который **явно** использует SOCKS. Прямой запрос с хоста всегда показывает ISP-путь — это не поломка.
+
+### 1. Процесс жив
+
+```bash
+curl -fsS --max-time 5 "http://127.0.0.1:${HOST_HEALTH_PORT:-28080}/readyz"
+```
+
+Ожидание: HTTP 200 и `"ready":true`. Иначе смотрите `docker compose logs` — ключ, сеть до Outline, ssconf.
+
+### 2. Сравнить путь хоста и путь SOCKS
+
+Нужен любой **HTTPS IP-echo** (сервис, который отвечает телом с адресом клиента). URL в переменную, значения **не печатать**:
+
+```bash
+# задайте свой echo-URL
+: "${IP_ECHO:?set IP_ECHO to an HTTPS IP-echo URL}"
+
+SOCKS="socks5h://127.0.0.1:${HOST_SOCKS_PORT:-1080}"
+
+direct=$(curl -fsS --max-time 10 "$IP_ECHO") || exit 1
+via_socks=$(curl -fsS --max-time 15 -x "$SOCKS" "$IP_ECHO") || exit 1
+
+if [ -n "$direct" ] && [ -n "$via_socks" ] && [ "$direct" != "$via_socks" ]; then
+  echo "ok: SOCKS egress differs from the host path"
+else
+  echo "fail: SOCKS path matches the host (proxy not used, or tunnel not carrying traffic)" >&2
+  exit 1
+fi
+```
+
+| Результат | Значение |
+|-----------|----------|
+| строки **разные** | трафик через SOCKS ушёл в Outline |
+| строки **одинаковые** | запрос не через туннель (нет proxy, fallback, или `GATEWAY_ENABLE=false` и клиент ходил напрямую) |
+| ошибка curl / SOCKS `0x08` | часто локальный резолв в IPv6: нужен **`socks5h`**, не `socks5` |
+
+**`socks5h`** (и `curl --socks5-hostname`) резолвит имя **на стороне proxy**. Схема `socks5://` резолвит на хосте; при AAAA outline-gate отклоняет IPv6 CONNECT — клиент может уйти в обход прокси.
+
+В браузере: SOCKS5 + **DNS through SOCKS**. В журнале UI (**Лог**) успешная проверка — цепочка `SOCKS → VPN`.
+
+### 3. Чего не делать
+
+- Не судить по прямому curl/браузеру на хосте: без SOCKS это всегда ISP.
+- Не вставлять в отчёты и тикеты полученные адреса.
+- Не путать готовность процесса (`/readyz`) с тем, что *ваше* приложение настроено на `:1080`.
 
 ---
 
@@ -119,30 +232,30 @@ Bridge-сеть `outline-gate_net` = `192.168.102.0/24` (явный IPAM; не �
 | Канал | Ссылка |
 |-------|--------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
-| Latest tag | [`v0.4.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.4.0) |
+| Latest tag | [`v0.6.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Module path | `github.com/unhexx/outline-gate` |
-| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.4.0`) |
+| Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.6.0`) |
 
 ### Docker (рекомендуется)
 
 ```bash
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-./install.sh 'ss://...'          # или: git checkout v0.4.0 && ./install.sh 'ss://...'
+./install.sh 'ss://...'          # или: git checkout v0.6.0 && ./install.sh 'ss://...'
 ```
 
 Образ с меткой релиза:
 
 ```bash
-docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.4.0 -t outline-gate:v0.4.0 .
+docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.6.0 -t outline-gate:v0.6.0 .
 ```
 
 ### Бинарник Linux amd64
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.4.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64
 chmod +x outline-gate
 export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate
@@ -168,7 +281,7 @@ export OUTLINE_ACCESS_KEY='ss://...'
 | UDP | не в v1 | не в v1 (TCP-first) |
 | Типичный кейс | ноутбук, браузер, CLI | TV, IoT, «роутер с VPN» |
 
-**Можно использовать оба сразу:** L3 для устройств без proxy + SOCKS для приложений на том же хосте.
+**Можно использовать оба сразу:** L3 для устройств без proxy + SOCKS для приложений на том же хосте. Быстрый старт: [прокси и шлюз одновременно](#прокси-и-шлюз-одновременно).
 
 ---
 
@@ -199,37 +312,23 @@ docker compose up --build -d
 curl -s http://127.0.0.1:28080/readyz
 ```
 
-Проверка, что egress идёт через Outline:
-
-```bash
-# без proxy — IP вашего ISP
-curl -s https://ifconfig.me; echo
-
-# через SOCKS — IP Outline-сервера (или egress VPN)
-curl -s --socks5h 127.0.0.1:1080 https://ifconfig.me; echo
-```
-
-> Используйте **`socks5h`** (не `socks5`), чтобы DNS резолвился на стороне proxy — меньше DNS-утечек.
+Дальше — [проверка подключения](#проверка-подключения) (`socks5h`, сравнение путей без печати адресов).
 
 ### 2. curl / wget
 
 ```bash
-# HTTP(S) через SOCKS
-curl -x socks5h://127.0.0.1:1080 https://example.com
+# HTTP(S) через SOCKS (DNS на стороне proxy)
+curl -x socks5h://127.0.0.1:1080 "$IP_ECHO"
 
-# или
-curl --socks5-hostname 127.0.0.1:1080 https://ifconfig.me
+# эквивалент
+curl --socks5-hostname 127.0.0.1:1080 "$IP_ECHO"
 
 export ALL_PROXY=socks5h://127.0.0.1:1080
-curl -s https://ifconfig.me
+curl -fsS "$IP_ECHO" >/dev/null
 unset ALL_PROXY
 ```
 
-С LAN-клиента (IP хоста Docker, например `192.168.1.10`):
-
-```bash
-curl -x socks5h://192.168.1.10:1080 https://ifconfig.me
-```
+С другого хоста LAN подставьте адрес машины с outline-gate вместо loopback (тот же `socks5h` и порт `HOST_SOCKS_PORT`).
 
 ### 3. Firefox
 
@@ -238,7 +337,7 @@ curl -x socks5h://192.168.1.10:1080 https://ifconfig.me
 3. **SOCKS Host:** `127.0.0.1` (или IP gate), **Port:** `1080`
 4. Выберите **SOCKS v5**
 5. Включите **Proxy DNS when using SOCKS v5**
-6. OK → откройте https://ifconfig.me
+6. OK → откройте любой IP-echo по HTTPS и сравните с запросом *без* proxy (как в [проверке подключения](#проверка-подключения))
 
 ### 4. Chromium / Chrome
 
@@ -248,8 +347,10 @@ Chrome не имеет встроенного SOCKS-UI. Варианты:
 # Linux: отдельный профиль + proxy-server
 google-chrome --user-data-dir=/tmp/chrome-socks \
   --proxy-server="socks5://127.0.0.1:1080" \
-  https://ifconfig.me
+  --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE localhost"
 ```
+
+(Chrome сам резолвит DNS, если не задать resolver-rules; для проверки egress надёжнее curl + `socks5h`.)
 
 Или расширение / системный proxy (зависит от ОС).
 
@@ -278,8 +379,8 @@ git config --global --unset https.proxy
 
 ```bash
 docker run --rm curlimages/curl:latest \
-  -x socks5h://172.17.0.1:1080 https://ifconfig.me
-# 172.17.0.1 — типичный gateway docker0 к хосту; в LAN используйте IP хоста
+  -x "socks5h://host.docker.internal:${HOST_SOCKS_PORT:-1080}" "$IP_ECHO"
+# Linux: добавьте --add-host=host.docker.internal:host-gateway
 ```
 
 ### 8. Bypass в SOCKS
@@ -311,9 +412,13 @@ curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
 # удалить
 curl -s -X DELETE "${AUTH[@]}" \
   "http://127.0.0.1:${PORT}/api/v1/bypass?rule=*.example.com"
+
+# блок-лист (drop)
+curl -s -X POST "${AUTH[@]}" -H 'Content-Type: application/json' \
+  -d '{"rule":"*.ads.example"}' "http://127.0.0.1:${PORT}/api/v1/block"
 ```
 
-Без UI: правка `deploy/compose/config/bypass.rules.txt` + `docker kill -s HUP outline-gate`.  
+Без UI: правка `deploy/compose/config/bypass.rules.txt` или `block.rules.txt` + `docker kill -s HUP outline-gate`.  
 Подробнее: [docs/OPERATIONS.ru.md §7.2](docs/OPERATIONS.ru.md).
 
 ### 9. Безопасность SOCKS
@@ -381,13 +486,7 @@ sudo ip route replace default via 192.168.1.10 dev eth0
 
 ### Проверка L3
 
-На клиенте (без SOCKS):
-
-```bash
-curl -s https://ifconfig.me; echo
-# при exclude + рабочем туннеле — IP Outline egress
-# при доступе к 192.168.x.x — direct (bypass RFC1918)
-```
+На клиенте (без SOCKS): тот же скрипт [проверки подключения](#проверка-подключения), но «direct» снимите с машины **вне** этого шлюза. При рабочем exclude egress клиента не должен совпадать с ISP той контрольной машины. RFC1918 остаётся на kernel-path.
 
 На хосте:
 
@@ -482,11 +581,7 @@ DIRECT_POLICY=direct
 GATEWAY_ENABLE=true
 ```
 
-```bash
-# на клиенте с GW=gate
-curl -s --connect-to ifconfig.me:443:8.8.8.8:443 https://ifconfig.me   # не показательно
-# проще: traceroute / tcpdump; для 8.8.8.8 TCP уйдёт в tunnel set
-```
+На клиенте с GW=gate проще `traceroute` / `tcpdump` по адресам из `TUNNEL_CIDRS`, чем IP-echo: echo-сервис почти наверняка не входит в include-список.
 
 **`DIRECT_POLICY=drop`:** всё, что не bypass и не tunnel, **режется** (жёсткий allow-list). Осторожно: легко «убить» интернет на клиентах, если tunnel-список неполный.
 
@@ -557,6 +652,7 @@ docker compose up -d --force-recreate
 | `GET /api/v1/connections/stream` | Bearer / Basic / `?token=` | SSE live-лог (EventSource) |
 | `GET/PUT /api/v1/outline` | Bearer / Basic | статус / замена ключа |
 | `GET/POST/DELETE /api/v1/bypass` | Bearer / Basic | правила исключений |
+| `GET/POST/DELETE /api/v1/block` | Bearer / Basic | блок-лист (drop + лог) |
 | `/healthz`, `/readyz` | нет | healthcheck |
 
 **Лог подключений:** SOCKS и L3 показывают цепочку `клиент → SOCKS|L3 → VPN|Direct → host` (и правило bypass, если известно). На L3 private/RFC1918 остаётся kernel-path без записи в лог; остальной Internet TCP (включая user Direct) идёт через transparent proxy.
@@ -574,6 +670,7 @@ docker compose up -d --force-recreate
 | `ROUTING_MODE` | `exclude` \| `include` |
 | `BYPASS_CIDRS` / `BYPASS_CIDRS_FILE` | Статические CIDR-исключения |
 | `BYPASS_RULES_FILE` | User-правила (IP/домены) UI |
+| `BLOCK_RULES_FILE` | Блок-лист (IP/CIDR/домен/`*.mask`); drop + запись в лог |
 | `TUNNEL_CIDRS` / `TUNNEL_CIDRS_FILE` | Цели (include) |
 | `DIRECT_POLICY` | `direct` \| `drop` (include) |
 | `GATEWAY_ENABLE` | L3 nftables |
@@ -582,6 +679,9 @@ docker compose up -d --force-recreate
 | `SOCKS_LISTEN` / `HEALTH_LISTEN` | Слушатели в контейнере |
 | `SOCKS_ALLOW_CIDRS` / `_FILE` | Allowlist source IP для SOCKS (пусто = все; при non-loopback — `Warn` на старте) |
 | `METRICS_ENABLE` | `true` → Prometheus text на `/metrics` (health-порт) |
+| `SSCONF_REFRESH_INTERVAL` | Период перечитывания `ssconf://` (default `2m`, `0` = выкл.) |
+| `TUNNEL_PROBE_ADDR` | TCP-probe через туннель (default `1.1.1.1:443`, `off` = выкл.) |
+| `TUNNEL_PROBE_INTERVAL` / `_TIMEOUT` / `_FAILS` | Период / дедлайн / порог фейлов до reconnect |
 | `LOG_LEVEL` | `debug` / `info` / `warn` / `error` |
 
 Полный список: [`deploy/compose/.env.example`](deploy/compose/.env.example).
@@ -664,12 +764,12 @@ docker run --rm -d --name outline-gate \
 # GitHub
 git clone https://github.com/unhexx/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
+git checkout v0.6.0
 
 # Internal
 git clone https://git.aservice24.ru/scm/expert/outline-gate.git
 cd outline-gate
-git checkout v0.4.0
+git checkout v0.6.0
 ```
 
 ## Безопасность
@@ -678,7 +778,7 @@ git checkout v0.4.0
 - Не коммитьте `.env`, `*.runtime.txt` и реальные ключи
 - В логах ключ редактируется (`ss://***@host:port`)
 - API UI без токена → `401` (`/api/v1/version` публичный)
-- Ограничения v0.4: TCP-first (UDP L3 неполный), IPv6 nft gap, domain-bypass на L3 — best-effort
+- Ограничения v0.6: TCP-first (UDP L3 неполный), IPv6 nft gap, domain-bypass на L3 — best-effort
 
 ## License
 

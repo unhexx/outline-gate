@@ -14,21 +14,37 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ### Added
 
-- `docs/DEPLOY.ru.md` — пошаговое развёртывание на другом хосте
-- `deploy/compose/install.sh` — one-shot build/up/readyz (`--host`, `--socks`, `--down`, `--check`)
-- Makefile targets: `install`, `install-host`, `down`
-- Compose/env: явный проброс `SOCKS_ALLOW_CIDRS` / `SOCKS_ALLOW_CIDRS_FILE`
+- README: connectivity check that compares host vs SOCKS egress without printing addresses; stack badges
+- README / DEPLOY / OPERATIONS: раздел «прокси и шлюз одновременно» (`./install.sh --host` = SOCKS5 + L3)
+
+## [0.6.0] — 2026-08-17
+
+### Added
+
+- Destination block list: IP / CIDR / domain / `*.suffix` (`BLOCK_RULES_FILE`, Web UI tab **Блок**, `GET/POST/DELETE /api/v1/block`)
+- Blocked SOCKS and L3 connections appear in the live log as **Блок** (`via=drop`) with the matched rule
 
 ### Changed
 
-- `configure.sh`: профиль socks|host, UI_TOKEN (автоген), порты, SOCKS allowlist; bootstrap `config/*`
-- `.env.example`: `HOST_HEALTH_PORT=28080` по умолчанию, комментарии allowlist / `COMPOSE_PROFILE`
-- Runtime `config/bypass.rules.txt` больше не в git (шаблон — `bypass.rules.example.txt`)
-- `bypass.rules.example.txt`: предустановленные исключения `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`
-- Docs: простые команды добавления/удаления bypass (API + файл + `SIGHUP`) — `OPERATIONS.ru.md` §7.2, README
+- README badges and install docs for v0.6.0
+
+## [0.5.0] — 2026-08-17
+
+### Added
+
+- Periodic `ssconf://` refresh and Outline tunnel TCP probe so a rotated provider endpoint no longer leaves SOCKS healthy-but-dead (`SSCONF_REFRESH_INTERVAL`, `TUNNEL_PROBE_*`)
+- Prometheus counters `outline_gate_tunnel_probe_total` and `outline_gate_ssconf_refresh_total`
+- `docs/DEPLOY.ru.md` — пошаговое развёртывание на другом хосте
+- `deploy/compose/install.sh` / root `install.sh` — one-shot build/up/readyz (`--host`, `--socks`, `--down`, `--check`)
+- Makefile targets: `install`, `install-host`, `down`
+- Compose/env: явный проброс `SOCKS_ALLOW_CIDRS` / `SOCKS_ALLOW_CIDRS_FILE`
 
 ### Fixed
 
+- Stale Outline dialer after `ssconf://` backend rotation: `/readyz` stayed 200 while SOCKS timed out
+- SOCKS/L3 tunnel dial failures now logged at Warn (were Debug-only)
+- Compose bridge uses explicit IPAM (`outline-gate_net` / `COMPOSE_SUBNET`) so `docker compose up` works when Docker default-address-pools are exhausted
+- `install.sh` invoked via `bash` (no `+x` / noexec required)
 - SOCKS IP CONNECT now bypasses static/RFC1918 CIDRs (`BYPASS_CIDRS`), not only user rules
 - `?token=` authorizes only `GET /api/v1/connections/stream` (no longer all `/api/*`)
 - connlog: no panic when an SSE client unsubscribes during `Record`
@@ -37,6 +53,15 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 - SIGHUP applies `SOCKS_ALLOW_CIDRS` to the live SOCKS listener
 - Persist access key with fsync; `/readyz` 503 JSON Content-Type
 - Web UI: VPN log filter no longer includes Drop; ready pill keeps its icon
+
+### Changed
+
+- `configure.sh`: профиль socks|host, UI_TOKEN (автоген), порты, SOCKS allowlist; bootstrap `config/*`
+- `.env.example`: `HOST_HEALTH_PORT=28080` по умолчанию, комментарии allowlist / `COMPOSE_PROFILE`
+- Runtime `config/bypass.rules.txt` больше не в git (шаблон — `bypass.rules.example.txt`)
+- `bypass.rules.example.txt`: предустановленные исключения `*.max.ru`, `*.aq.ru`, `*.aq.local`, `*.aservice24.ru`, `*.yandex.cloud`, `*.yandex.ru`
+- Docs: простые команды добавления/удаления bypass (API + файл + `SIGHUP`) — `OPERATIONS.ru.md` §7.2, README
+- README badges and install docs for v0.5.0
 
 ## [0.4.0] — 2026-07-27
 

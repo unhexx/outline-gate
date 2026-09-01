@@ -14,6 +14,8 @@ type EnginePathDecider struct {
 	Engine func() *routing.Engine
 	// Bypass optionally labels Direct matches (for connection log).
 	Bypass BypassMatcher
+	// Block drops matching destinations before tunnel/direct (user block list).
+	Block BypassMatcher
 }
 
 // DecidePath implements PathDecider.
@@ -30,6 +32,11 @@ func (d *EnginePathDecider) DecidePath(dst net.IP) (via string, rule string) {
 		d.Mu.Unlock()
 	} else if d.Engine != nil {
 		eng = d.Engine()
+	}
+	if d.Block != nil {
+		if ok, r := d.Block.MatchBypass(dst.String()); ok {
+			return PathDrop, r
+		}
 	}
 	if eng == nil {
 		return PathTunnel, ""

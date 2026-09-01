@@ -150,7 +150,11 @@ func (t *Transparent) handle(ctx context.Context, conn net.Conn) {
 	remote, err := dialer.DialContext(dctx, "tcp", orig)
 	dur := time.Since(start).Milliseconds()
 	if err != nil {
-		t.Logger.Debug("transparent dial failed", "target", orig, "via", via, "err", err)
+		if via == PathTunnel {
+			t.Logger.Warn("transparent dial failed", "target", orig, "via", via, "err", err)
+		} else {
+			t.Logger.Debug("transparent dial failed", "target", orig, "via", via, "err", err)
+		}
 		t.record(ConnEvent{
 			Proto: "l3", ClientIP: clientIP, Target: orig, Host: host, Port: port,
 			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,

@@ -38,3 +38,38 @@ func TestEnginePathDeciderDirectAndDrop(t *testing.T) {
 		t.Fatalf("drop: via=%s rule=%s", via, rule)
 	}
 }
+
+type mapBlock map[string]string
+
+func (m mapBlock) ShouldBypassHost(host string) bool {
+	_, ok := m[host]
+	return ok
+}
+
+func (m mapBlock) MatchBypass(host string) (bool, string) {
+	r, ok := m[host]
+	return ok, r
+}
+
+func TestEnginePathDeciderBlockOverridesTunnel(t *testing.T) {
+	cfg := &config.Config{
+		RoutingMode:  config.ModeExclude,
+		DirectPolicy: config.DirectAllow,
+		BypassCIDRs:  config.DefaultBypassCIDRs(),
+	}
+	eng := routing.New(cfg, nil)
+	var mu sync.Mutex
+	d := &EnginePathDecider{
+		Mu:     &mu,
+		Engine: func() *routing.Engine { return eng },
+		Block:  mapBlock{"8.8.8.8": "8.8.8.8"},
+	}
+	via, rule := d.DecidePath(net.ParseIP("8.8.8.8"))
+	if via != PathDrop || rule != "8.8.8.8" {
+		t.Fatalf("block: via=%s rule=%s", via, rule)
+	}
+	via, _ = d.DecidePath(net.ParseIP("1.1.1.1"))
+	if via != PathTunnel {
+		t.Fatalf("unlisted: via=%s", via)
+	}
+}

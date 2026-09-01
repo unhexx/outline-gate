@@ -4,13 +4,21 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.getoutline.org/sdk/transport"
 )
 
 func TestResolveServerIP_Literal(t *testing.T) {
@@ -44,7 +52,7 @@ func (timeoutErr) Timeout() bool   { return true }
 func (timeoutErr) Temporary() bool { return true }
 
 func TestTransportFailuresMarkNotReady(t *testing.T) {
-	c := &Client{reconnectBase: time.Second, reconnectMax: time.Second}
+	c := &Client{reconnectBase: time.Second, reconnectMax: time.Second, probeFails: 2, logger: discardLogger()}
 	c.serverIP = []byte{45, 151, 102, 145}
 	c.ready.Store(true)
 
@@ -53,11 +61,9 @@ func TestTransportFailuresMarkNotReady(t *testing.T) {
 		t.Fatal("destination errors must not flip ready")
 	}
 
-	for i := 1; i < transportFailThreshold; i++ {
-		c.noteDialResult(timeoutErr{})
-		if !c.Ready() {
-			t.Fatalf("still ready after %d timeouts", i)
-		}
+	c.noteDialResult(timeoutErr{})
+	if !c.Ready() {
+		t.Fatal("still ready after 1 timeout")
 	}
 	c.noteDialResult(timeoutErr{})
 	if c.Ready() {
@@ -65,8 +71,8 @@ func TestTransportFailuresMarkNotReady(t *testing.T) {
 	}
 
 	c.noteDialResult(nil)
-	if !c.Ready() {
-		t.Fatal("successful dial should restore ready")
+	if c.failCount.Load() != 0 {
+		t.Fatal("successful dial should reset fail counter")
 	}
 }
 
@@ -199,4 +205,248 @@ func TestParseDynamicBody_URLSafeUserinfoAndIPv6(t *testing.T) {
 	if u.Hostname() != "2001:db8::1" || u.Port() != "443" {
 		t.Fatalf("IPv6 host: %q host=%q port=%q", ss, u.Hostname(), u.Port())
 	}
+}
+
+func TestAccessKeyEndpoint(t *testing.T) {
+	got := AccessKeyEndpoint("ss://YWVzLTEyOC1nY206dGVzdA@10.0.0.1:11097")
+	if got != "10.0.0.1:11097" {
+		t.Fatalf("got %q", got)
+	}
+	if AccessKeyEndpoint("") != "" {
+		t.Fatal("empty")
+	}
+}
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+const testSS1 = "ss://YWVzLTEyOC1nY206dGVzdA@10.0.0.1:1"
+const testSS2 = "ss://YWVzLTEyOC1nY206dGVzdA@10.0.0.2:1"
+
+type fakeStreamDialer struct {
+	mu    sync.Mutex
+	err   error
+	dials []string
+}
+
+func (f *fakeStreamDialer) DialStream(ctx context.Context, addr string) (transport.StreamConn, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dials = append(f.dials, addr)
+	if f.err != nil {
+		return nil, f.err
+	}
+	a, b := net.Pipe()
+	go b.Close()
+	return stubConn{a}, nil
+}
+
+func (f *fakeStreamDialer) setErr(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.err = err
+}
+
+type stubConn struct{ net.Conn }
+
+func (s stubConn) CloseRead() error  { return s.Conn.Close() }
+func (s stubConn) CloseWrite() error { return s.Conn.Close() }
+
+func testClient(t *testing.T, key string, expand func(context.Context, string) (string, error), d *fakeStreamDialer) *Client {
+	t.Helper()
+	c, err := New(Options{
+		AccessKey:       key,
+		ReconnectBase:   20 * time.Millisecond,
+		ReconnectMax:    50 * time.Millisecond,
+		ProbeAddr:       "",
+		ProbeFails:      2,
+		RefreshInterval: 0,
+		Logger:          discardLogger(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expand != nil {
+		c.expand = expand
+	} else {
+		c.expand = func(_ context.Context, k string) (string, error) { return k, nil }
+	}
+	c.newDialer = func(context.Context, string) (transport.StreamDialer, error) { return d, nil }
+	return c
+}
+
+func waitUntil(t *testing.T, timeout time.Duration, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if ok() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("condition not met within %s", timeout)
+}
+
+func TestRefreshIfChanged_RebuildsOnNewEndpoint(t *testing.T) {
+	var n atomic.Int32
+	expand := func(context.Context, string) (string, error) {
+		if n.Add(1) == 1 {
+			return testSS1, nil
+		}
+		return testSS2, nil
+	}
+	d := &fakeStreamDialer{}
+	c := testClient(t, "ssconf://provider.example/key", expand, d)
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if ip := c.ServerIP(); ip == nil || ip.String() != "10.0.0.1" {
+		t.Fatalf("server ip: %v", ip)
+	}
+	if !c.refreshIfChanged(context.Background()) {
+		t.Fatal("expected rebuild on endpoint change")
+	}
+	if ip := c.ServerIP(); ip == nil || ip.String() != "10.0.0.2" {
+		t.Fatalf("server ip after refresh: %v", ip)
+	}
+	if !c.Ready() {
+		t.Fatal("should stay ready")
+	}
+}
+
+func TestRefreshIfChanged_FetchErrorKeepsDialer(t *testing.T) {
+	var fail atomic.Bool
+	expand := func(context.Context, string) (string, error) {
+		if fail.Load() {
+			return "", errors.New("ssconf down")
+		}
+		return testSS1, nil
+	}
+	d := &fakeStreamDialer{}
+	c := testClient(t, "ssconf://provider.example/key", expand, d)
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	fail.Store(true)
+	var refreshErr error
+	c.OnRefresh = func(err error, changed bool) {
+		refreshErr = err
+		if changed {
+			t.Error("changed should be false")
+		}
+	}
+	if c.refreshIfChanged(context.Background()) {
+		t.Fatal("should not rebuild")
+	}
+	if refreshErr == nil {
+		t.Fatal("expected refresh error hook")
+	}
+	if !c.Ready() {
+		t.Fatal("must keep ready on fetch failure")
+	}
+	if ip := c.ServerIP(); ip == nil || ip.String() != "10.0.0.1" {
+		t.Fatalf("server ip: %v", ip)
+	}
+}
+
+func TestRefreshIfChanged_StaticKeySkipped(t *testing.T) {
+	var expands atomic.Int32
+	expand := func(_ context.Context, key string) (string, error) {
+		expands.Add(1)
+		return key, nil
+	}
+	d := &fakeStreamDialer{}
+	c := testClient(t, testSS1, expand, d)
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if expands.Load() != 1 {
+		t.Fatalf("connect expands: %d", expands.Load())
+	}
+	if c.refreshIfChanged(context.Background()) {
+		t.Fatal("static key should not refresh")
+	}
+	if expands.Load() != 1 {
+		t.Fatalf("refresh must not expand static key, got %d", expands.Load())
+	}
+}
+
+func TestDialContext_ConsecutiveFailuresMarkUnready(t *testing.T) {
+	d := &fakeStreamDialer{err: timeoutErr{}}
+	c := testClient(t, testSS1, nil, d)
+	c.probeFails = 2
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Ready() {
+		t.Fatal("ready after connect")
+	}
+	_, err := c.DialContext(context.Background(), "tcp", "1.1.1.1:443")
+	if err == nil {
+		t.Fatal("expected dial error")
+	}
+	if !c.Ready() {
+		t.Fatal("still ready after 1 failure")
+	}
+	_, err = c.DialContext(context.Background(), "tcp", "1.1.1.1:443")
+	if err == nil {
+		t.Fatal("expected dial error")
+	}
+	if c.Ready() {
+		t.Fatal("expected not ready after threshold")
+	}
+}
+
+func TestMaintainReady_RefreshSwitchesEndpoint(t *testing.T) {
+	var n atomic.Int32
+	expand := func(context.Context, string) (string, error) {
+		if n.Load() == 0 {
+			n.Add(1)
+			return testSS1, nil
+		}
+		return testSS2, nil
+	}
+	d := &fakeStreamDialer{}
+	c := testClient(t, "ssconf://provider.example/key", expand, d)
+	c.refreshEvery = 25 * time.Millisecond
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.MaintainReady(ctx, nil)
+	waitUntil(t, 2*time.Second, func() bool {
+		ip := c.ServerIP()
+		return ip != nil && ip.String() == "10.0.0.2" && c.Ready()
+	})
+}
+
+func TestMaintainReady_ProbeFailuresReconnect(t *testing.T) {
+	var expands atomic.Int32
+	expand := func(context.Context, string) (string, error) {
+		expands.Add(1)
+		return testSS1, nil
+	}
+	d := &fakeStreamDialer{}
+	c := testClient(t, "ssconf://provider.example/key", expand, d)
+	c.probeAddr = "1.1.1.1:443"
+	c.probeInterval = 20 * time.Millisecond
+	c.probeTimeout = 50 * time.Millisecond
+	c.probeFails = 2
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	before := expands.Load()
+	d.setErr(errors.New("probe fail"))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go c.MaintainReady(ctx, nil)
+	waitUntil(t, 2*time.Second, func() bool {
+		return expands.Load() > before
+	})
+	d.setErr(nil)
+	waitUntil(t, 2*time.Second, func() bool {
+		return c.Ready()
+	})
 }

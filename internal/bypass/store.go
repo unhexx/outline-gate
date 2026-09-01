@@ -10,8 +10,8 @@ import (
 
 // Store is a thread-safe, file-backed set of user bypass rules.
 type Store struct {
-	path string
-	mu   sync.RWMutex
+	path  string
+	mu    sync.RWMutex
 	rules []Rule
 }
 
@@ -153,7 +153,7 @@ func (s *Store) persistLocked(rules []Rule) error {
 		return nil
 	}
 	var b strings.Builder
-	b.WriteString("# outline-gate user bypass rules (managed by UI/API)\n")
+	b.WriteString("# outline-gate user rules (managed by UI/API)\n")
 	for _, r := range rules {
 		b.WriteString(r.Raw)
 		b.WriteByte('\n')

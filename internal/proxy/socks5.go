@@ -59,6 +59,8 @@ type SOCKS5 struct {
 	DirectDialer Dialer
 	// Bypass optionally selects direct path for excluded hosts/IPs.
 	Bypass BypassChecker
+	// Block optionally rejects destinations (policy drop) before bypass/tunnel.
+	Block BypassChecker
 	// AllowCIDRs, when non-empty, accepts only clients whose source IP is in
 	// one of the networks. Empty means allow all (trusted LAN).
 	// Update at runtime with SetAllowCIDRs (SIGHUP).
@@ -221,6 +223,17 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	portInt := int(port)
 	target := net.JoinHostPort(host, strconv.Itoa(portInt))
 
+	if blocked, r := matchChecker(s.Block, host); blocked {
+		log.Debug("SOCKS blocked", "target", target, "rule", r)
+		s.record(ConnEvent{
+			Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
+			Via: "drop", Rule: r, OK: false, Error: "blocked",
+		})
+		// 0x02 = connection not allowed by ruleset
+		_, _ = conn.Write([]byte{0x05, 0x02, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
+	}
+
 	dctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	dialer := s.Dialer
@@ -247,7 +260,11 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	remote, err := dialer.DialContext(dctx, "tcp", target)
 	dur := time.Since(start).Milliseconds()
 	if err != nil {
-		log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
+		if via == "tunnel" {
+			log.Warn("SOCKS dial failed", "target", target, "via", via, "err", err)
+		} else {
+			log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
+		}
 		s.record(ConnEvent{
 			Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
 			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,
@@ -289,6 +306,19 @@ func clientIPOf(conn net.Conn) string {
 
 // ipAllowed reports whether clientIP is contained in any of nets.
 // Empty clientIP or invalid IP is not allowed when nets is non-empty.
+func matchChecker(c BypassChecker, host string) (bool, string) {
+	if c == nil {
+		return false, ""
+	}
+	if bm, ok := c.(BypassMatcher); ok {
+		return bm.MatchBypass(host)
+	}
+	if c.ShouldBypassHost(host) {
+		return true, ""
+	}
+	return false, ""
+}
+
 func ipAllowed(clientIP string, nets []net.IPNet) bool {
 	if len(nets) == 0 {
 		return true
