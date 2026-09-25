@@ -46,7 +46,8 @@ type Server struct {
 }
 
 // Mount registers UI and API routes on mux. Health routes stay separate.
-// Static UI is public (no secrets); all /api/* calls require Token except /api/v1/version.
+// The UI shell is reachable without a header. index.html embeds Token so the
+// page authorizes itself. Other /api/* calls require Token except /api/v1/version.
 func (s *Server) Mount(mux *http.ServeMux) {
 	if s == nil {
 		return
@@ -83,7 +84,7 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	} else {
 		static = http.NotFoundHandler()
 	}
-	ui := http.StripPrefix("/ui/", static)
+	ui := http.StripPrefix("/ui/", s.serveUI(static))
 	mux.Handle("/ui/", ui)
 	mux.Handle("/ui", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/ui/", http.StatusFound)

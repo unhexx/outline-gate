@@ -4,6 +4,7 @@ package gateway
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -74,6 +75,7 @@ func (g *Gateway) applyLocked() error {
 	g.logger.Info("gateway rules applied",
 		"mode", g.cfg.RoutingMode,
 		"transproxy_port", g.cfg.TransproxyPort,
+		"output_redirect", g.cfg.GatewayOutputEnable,
 	)
 	return nil
 }
@@ -128,7 +130,17 @@ func (g *Gateway) buildNFTScript() (string, error) {
 		fmt.Fprintf(&b, "add element inet %s private { %s }\n", tableName, n.String())
 	}
 
-	// prerouting: redirect non-private TCP to local transparent proxy
+	// @bypass: user + default reserved + Outline server IPs. Used only on
+	// OUTPUT so the process can dial the tunnel / Direct without looping
+	// back into the transparent proxy. PREROUTING still redirects these
+	// (except @private) so LAN/Docker Direct is logged in userspace.
+	fmt.Fprintf(&b, "add set inet %s bypass { type ipv4_addr; flags interval; }\n", tableName)
+	addIPv4SetElements(&b, "bypass", g.engine.BypassNets())
+
+	fmt.Fprintf(&b, "add set inet %s tunnel { type ipv4_addr; flags interval; }\n", tableName)
+	addIPv4SetElements(&b, "tunnel", g.engine.TunnelNets())
+
+	// prerouting: redirect non-private IPv4 TCP to local transparent proxy
 	fmt.Fprintf(&b, "add chain inet %s prerouting { type nat hook prerouting priority dstnat; policy accept; }\n", tableName)
 	fmt.Fprintf(&b, "add chain inet %s output { type nat hook output priority dstnat; policy accept; }\n", tableName)
 
@@ -136,11 +148,19 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	fmt.Fprintf(&b, "add rule inet %s prerouting tcp dport %d return\n", tableName, port)
 	// Private/reserved destinations stay on the kernel forward path.
 	fmt.Fprintf(&b, "add rule inet %s prerouting ip daddr @private return\n", tableName)
-	// Everything else (tunnel + user Direct + include residual) → userspace.
-	fmt.Fprintf(&b, "add rule inet %s prerouting meta l4proto tcp redirect to :%d\n", tableName, port)
+	// IPv4 only: inet + meta l4proto tcp would also catch IPv6.
+	fmt.Fprintf(&b, "add rule inet %s prerouting ip protocol tcp redirect to :%d\n", tableName, port)
 
-	// masquerade for forwarded traffic leaving LAN interface (or any)
+	if g.cfg.GatewayOutputEnable {
+		g.appendOutputRedirect(&b, port)
+	}
+
+	// masquerade for forwarded LAN traffic. Never SNAT loopback: an unscoped
+	// masquerade rewrites 127.0.0.1 to the primary NIC address and breaks
+	// loopback-only services (pxpipe dashboard, transproxy, local APIs).
 	fmt.Fprintf(&b, "add chain inet %s postrouting { type nat hook postrouting priority srcnat; policy accept; }\n", tableName)
+	fmt.Fprintf(&b, "add rule inet %s postrouting ip saddr 127.0.0.0/8 return\n", tableName)
+	fmt.Fprintf(&b, "add rule inet %s postrouting oifname \"lo\" return\n", tableName)
 	if ifc := strings.TrimSpace(g.cfg.LANInterface); ifc != "" {
 		fmt.Fprintf(&b, "add rule inet %s postrouting oifname %q masquerade\n", tableName, ifc)
 	} else {
@@ -148,6 +168,41 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func addIPv4SetElements(b *strings.Builder, set string, nets []net.IPNet) {
+	seen := make(map[string]struct{}, len(nets))
+	for _, n := range nets {
+		if n.IP.To4() == nil {
+			continue
+		}
+		s := n.String()
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		fmt.Fprintf(b, "add element inet %s %s { %s }\n", tableName, set, s)
+	}
+}
+
+// appendOutputRedirect intercepts locally originated IPv4 TCP.
+//
+// The outline-gate process must not be redirected: tunnel dials go to the
+// Outline server IP (in @bypass), Direct dials go to user-bypass destinations
+// (also @bypass). ssconf HTTP after Connect also needs those IPs in @bypass.
+//
+// exclude: redirect everything except private + bypass.
+// include: redirect only @tunnel (residual Direct never enters the proxy).
+func (g *Gateway) appendOutputRedirect(b *strings.Builder, port int) {
+	fmt.Fprintf(b, "add rule inet %s output tcp dport %d return\n", tableName, port)
+	fmt.Fprintf(b, "add rule inet %s output ip daddr @private return\n", tableName)
+	switch g.cfg.RoutingMode {
+	case config.ModeInclude:
+		fmt.Fprintf(b, "add rule inet %s output ip daddr @tunnel ip protocol tcp redirect to :%d\n", tableName, port)
+	default:
+		fmt.Fprintf(b, "add rule inet %s output ip daddr @bypass return\n", tableName)
+		fmt.Fprintf(b, "add rule inet %s output ip protocol tcp redirect to :%d\n", tableName, port)
+	}
 }
 
 func (g *Gateway) runNFTLocked(script string) error {

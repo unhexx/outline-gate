@@ -112,7 +112,7 @@ COMPOSE_PROFILE=socks    # socks | host (for install.sh)
 HOST_SOCKS_PORT=1080
 HOST_HEALTH_PORT=28080   # health + Web UI on the host
 UI_ENABLE=true
-UI_TOKEN=long-random-secret
+UI_TOKEN=Passw0rd
 # SOCKS_ALLOW_CIDRS=192.168.0.0/16,10.0.0.0/8,127.0.0.0/8
 LOG_LEVEL=info
 ```
@@ -162,7 +162,7 @@ docker run --rm -d --name outline-gate \
   -e ROUTING_MODE=exclude \
   -e GATEWAY_ENABLE=false \
   -e UI_ENABLE=true \
-  -e UI_TOKEN='change-me' \
+  -e UI_TOKEN='Passw0rd' \
   -e LOG_LEVEL=info \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
@@ -331,7 +331,7 @@ In `.env`:
 
 ```bash
 UI_ENABLE=true
-UI_TOKEN=long-random-secret
+UI_TOKEN=Passw0rd
 HOST_HEALTH_PORT=28080   # any free host port → container :8080
 ```
 
@@ -345,7 +345,7 @@ Open:
 http://HOST_IP:28080/ui/
 ```
 
-Enter `UI_TOKEN`. In the UI:
+The UI applies `UI_TOKEN` and does not ask for it. In the UI:
 
 1. **Outline key** — paste `ss://` / `ssconf://`, "Replace key" (reconnect + write `OUTLINE_KEY_PERSIST_FILE`).
 2. **Bypass** — IP / CIDR / domain / `*.suffix`.
@@ -535,7 +535,7 @@ Move to another host — **step 9** in [DEPLOY.md](DEPLOY.md).
 - Do not commit `.env` or real keys.
 - Keys in logs are redacted (`ss://***@host:port`).
 - Restrict `:8080` if you do not need it from outside.
-- With `UI_ENABLE=true` set a strong `UI_TOKEN`; API without a token returns 401. The UI page is public (no secrets on it); data changes only through the API with a token.
+- With `UI_ENABLE=true` the preset token is `Passw0rd` unless `UI_TOKEN` is set. API without that token returns 401. `/ui/` embeds the token so the browser can call the API; do not publish the health/UI port on the internet.
 
 ### 8.6. Common problems
 

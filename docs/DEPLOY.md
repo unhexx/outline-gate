@@ -180,7 +180,7 @@ Web UI (if `UI_ENABLE=true`):
 http://HOST_IP:28080/ui/
 ```
 
-Enter `UI_TOKEN` → bypass list and Outline key replace.
+The page applies `UI_TOKEN` itself (preset `Passw0rd` when unset) → bypass list and Outline key replace.
 
 ---
 

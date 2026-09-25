@@ -73,7 +73,12 @@
   let es = null;
   let stickBottom = true;
 
+  // Server injects the configured UI_TOKEN into index.html. When it is set,
+  // the page uses it and the token field stays hidden.
+  const presetToken = (typeof window.__OG_UI_TOKEN__ === "string" ? window.__OG_UI_TOKEN__ : "").trim();
+
   function getToken() {
+    if (presetToken) return presetToken;
     return sessionStorage.getItem(TOKEN_KEY) || "";
   }
 
@@ -659,7 +664,12 @@
     }
   });
 
-  el.token.value = getToken();
+  if (presetToken) {
+    const panel = document.getElementById("auth-panel");
+    if (panel) panel.hidden = true;
+  } else if (el.token) {
+    el.token.value = getToken();
+  }
   setAuthPill(!!getToken());
   loadVersion();
   loadAll();

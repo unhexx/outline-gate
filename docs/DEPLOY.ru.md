@@ -180,7 +180,7 @@ Web UI (если `UI_ENABLE=true`):
 http://IP-ХОСТА:28080/ui/
 ```
 
-Введите `UI_TOKEN` → bypass-список и замена ключа Outline.
+Страница сама подставляет `UI_TOKEN` (если пусто — `Passw0rd`) → bypass-список и замена ключа Outline.
 
 ---
 

@@ -274,5 +274,44 @@ func TestVersionEndpointPublic(t *testing.T) {
 	}
 }
 
+func TestUIIndexEmbedsPresetToken(t *testing.T) {
+	token := `p@ss</script>"'`
+	srv := &Server{Token: token, Static: StaticFS()}
+	mux := http.NewServeMux()
+	srv.Mount(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ui/", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("ui: %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `window.__OG_UI_TOKEN__=`) {
+		t.Fatalf("token bootstrap missing: %s", body)
+	}
+	if strings.Contains(body, "</script><script>") && strings.Contains(body, token) {
+		t.Fatalf("raw token leaked into markup")
+	}
+	quoted, err := json.Marshal(token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, "window.__OG_UI_TOKEN__="+string(quoted)) {
+		t.Fatalf("escaped token missing: %s", body)
+	}
+	if cc := rr.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Fatalf("cache-control: %q", cc)
+	}
+
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ui/app.js", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("app.js: %d", rr.Code)
+	}
+	if strings.Contains(rr.Body.String(), token) {
+		t.Fatal("app.js must not contain the configured token")
+	}
+}
+
 // ensure Manager interface is satisfied
 var _ Manager = (*bypass.Manager)(nil)

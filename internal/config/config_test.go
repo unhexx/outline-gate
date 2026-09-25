@@ -26,6 +26,9 @@ func TestLoadFromEnv_MinimalExclude(t *testing.T) {
 	if cfg.GatewayEnable {
 		t.Fatal("gateway should default false (SOCKS-only until explicitly enabled)")
 	}
+	if cfg.GatewayOutputEnable {
+		t.Fatal("OUTPUT redirect should default false (loop risk until host profile enables it)")
+	}
 	if cfg.BlockRulesFile != "/config/block.rules.txt" {
 		t.Fatalf("BlockRulesFile default: %s", cfg.BlockRulesFile)
 	}
@@ -151,17 +154,54 @@ func TestLoadFromEnv_UIRequiresToken(t *testing.T) {
 		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
 		"UI_ENABLE":          "true",
 	}
-	_, err := LoadFromEnv(func(k string) string { return env[k] })
-	if err == nil {
-		t.Fatal("expected UI_TOKEN required")
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.UIEnable || cfg.UIToken != DefaultUIToken {
+		t.Fatalf("empty UI_TOKEN should preset %q, got %+v", DefaultUIToken, cfg)
 	}
 	env["UI_TOKEN"] = "s3cret"
-	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	cfg, err = LoadFromEnv(func(k string) string { return env[k] })
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !cfg.UIEnable || cfg.UIToken != "s3cret" {
 		t.Fatalf("%+v", cfg)
+	}
+}
+
+func TestLoadFromEnv_DNSDoHDefaults(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY": "ss://x@1.1.1.1:1",
+		"DNS_MODE":           "doh",
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.DNSEnabled() {
+		t.Fatal("doh should enable DNS stub")
+	}
+	if cfg.DoHURL != "https://cloudflare-dns.com/dns-query" {
+		t.Fatalf("DoHURL %s", cfg.DoHURL)
+	}
+	if len(cfg.DNSListen) != 1 || cfg.DNSListen[0] != "127.0.0.1:53" {
+		t.Fatalf("DNSListen %v", cfg.DNSListen)
+	}
+}
+
+func TestLoadFromEnv_GatewayOutputEnable(t *testing.T) {
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY":    "ss://x@1.1.1.1:1",
+		"GATEWAY_OUTPUT_ENABLE": "true",
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.GatewayOutputEnable {
+		t.Fatal("expected GATEWAY_OUTPUT_ENABLE=true")
 	}
 }
 

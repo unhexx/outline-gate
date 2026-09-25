@@ -14,6 +14,7 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ### Changed
 
+- Web UI applies the configured `UI_TOKEN` by itself. The token field is hidden. Empty token with `UI_ENABLE=true` becomes the preset `Passw0rd` (compose, `.env.example`, `install.sh`)
 - Documentation is English-first (`README.md`, `docs/DEPLOY.md`, `docs/OPERATIONS.md`) with a language switch to Russian (`README.ru.md`, `*.ru.md`)
 
 ## [0.6.0] — 2026-09-01

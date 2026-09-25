@@ -81,16 +81,6 @@ prompt() {
   printf '%s' "$ans"
 }
 
-gen_token() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 24
-  elif [[ -r /dev/urandom ]]; then
-    head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'
-  else
-    date +%s%N
-  fi
-}
-
 echo "=== outline-gate: настройка ==="
 echo
 
@@ -177,12 +167,11 @@ if [[ "$UI_EN" == "true" ]]; then
   if grep -qE "^UI_TOKEN=" "$ENV_FILE" 2>/dev/null; then
     cur_tok=$(grep -E "^UI_TOKEN=" "$ENV_FILE" | head -1 | cut -d= -f2-)
   fi
-  if [[ -z "$cur_tok" || "$cur_tok" == "change-me-to-a-long-random-string" ]]; then
-    DEF_TOK=$(gen_token)
-  else
+  DEF_TOK="Passw0rd"
+  if [[ -n "$cur_tok" && "$cur_tok" != "change-me-to-a-long-random-string" ]]; then
     DEF_TOK="$cur_tok"
   fi
-  UT=$(prompt UI_TOKEN "UI_TOKEN (секрет для API/UI)" "$DEF_TOK")
+  UT=$(prompt UI_TOKEN "UI_TOKEN (преднастроен, Enter = Passw0rd; в UI вводить не нужно)" "$DEF_TOK")
   set_env UI_TOKEN "$UT"
 fi
 

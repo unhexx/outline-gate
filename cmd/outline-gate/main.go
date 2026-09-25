@@ -17,6 +17,7 @@ import (
 	"github.com/unhexx/outline-gate/internal/bypass"
 	"github.com/unhexx/outline-gate/internal/config"
 	"github.com/unhexx/outline-gate/internal/connlog"
+	"github.com/unhexx/outline-gate/internal/dnsdoh"
 	"github.com/unhexx/outline-gate/internal/gateway"
 	"github.com/unhexx/outline-gate/internal/health"
 	"github.com/unhexx/outline-gate/internal/logging"
@@ -265,6 +266,24 @@ func run() error {
 			}
 		})
 	}()
+
+	if cfg.DNSEnabled() {
+		doh := &dnsdoh.Server{
+			Listen:  cfg.DNSListen,
+			URL:     cfg.DoHURL,
+			Addr:    cfg.DoHAddr,
+			Dialer:  client,
+			Logger:  log,
+			Timeout: 8 * time.Second,
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := doh.ListenAndServe(ctx); err != nil {
+				errCh <- fmt.Errorf("dns-over-https: %w", err)
+			}
+		}()
+	}
 
 	socks := &proxy.SOCKS5{
 		ListenAddr: cfg.SOCKSListen,

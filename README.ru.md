@@ -580,34 +580,33 @@ TUNNEL_CIDRS=1.2.3.0/24
   <img src="docs/images/webui-mockup.svg" alt="Макет Web UI outline-gate" width="720"/>
 </p>
 
-### Вход: логин и пароль по умолчанию
+### Вход
 
-**Отдельного логина/пароля нет** — и **нет учётных данных по умолчанию** (`admin` / `password` не существуют).
+Отдельного логина нет. Web UI включён по умолчанию и использует преднастроенный токен **`Passw0rd`**. После установки откройте `/ui/` — поле токена скрыто, запросы к API уже авторизованы.
 
 | Что | По умолчанию |
 |-----|----------------|
-| Web UI | **выключен** (`UI_ENABLE=false`) |
+| Web UI | **включён** (`UI_ENABLE=true`) |
 | Логин | **не используется** |
-| Пароль / токен | **задаёте сами** в `UI_TOKEN` |
+| Токен | **`Passw0rd`** (`UI_TOKEN`; пустое значение становится этим) |
 
 ```bash
 # deploy/compose/.env
 UI_ENABLE=true
-UI_TOKEN=ваш-длинный-случайный-секрет
+UI_TOKEN=Passw0rd
 HOST_HEALTH_PORT=28080
 ```
 
 ```bash
-openssl rand -hex 24   # → в UI_TOKEN
 docker compose up -d --force-recreate
-# http://127.0.0.1:28080/ui/  → поле «Токен доступа» = UI_TOKEN
+# http://127.0.0.1:28080/ui/  — токен подставляется страницей
 ```
 
 **Авторизация API**
 
 | Способ | Как |
 |--------|-----|
-| Форма UI | `UI_TOKEN` → sessionStorage → `Authorization: Bearer …` |
+| Web UI | сервер встраивает `UI_TOKEN`; браузер шлёт `Authorization: Bearer …` |
 | curl | `Authorization: Bearer <UI_TOKEN>` |
 | HTTP Basic | username любой (`admin`), **password** = `UI_TOKEN` |
 
@@ -687,7 +686,7 @@ docker run --rm -d --name outline-gate \
   -e ROUTING_MODE=exclude \
   -e GATEWAY_ENABLE=false \
   -e UI_ENABLE=true \
-  -e UI_TOKEN='change-me' \
+  -e UI_TOKEN='Passw0rd' \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
   outline-gate:local
@@ -698,7 +697,7 @@ docker run --rm -d --name outline-gate \
 ## Best practices
 
 1. **Секреты** — `.env` / secrets / UI persist-файл; никогда в git и образ.
-2. **UI_TOKEN** — длинный случайный; UI/API не в публичный интернет без TLS reverse-proxy.
+2. **UI_TOKEN** — преднастроен как `Passw0rd` (страница его встраивает). Порт health/UI держите в доверенной сети.
 3. **SOCKS `:1080`** — только LAN / localhost; auth SOCKS в v1 нет.
 4. **L3** — всегда auto-bypass IP Outline-сервера; проверяйте после смены ключа.
 5. **Домены на L3** — best-effort; для точного hostname-match используйте SOCKS.

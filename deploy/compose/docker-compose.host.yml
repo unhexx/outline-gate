@@ -29,6 +29,9 @@ services:
       TUNNEL_CIDRS_FILE: ${TUNNEL_CIDRS_FILE:-/config/tunnel.txt}
       DIRECT_POLICY: ${DIRECT_POLICY:-direct}
       GATEWAY_ENABLE: ${GATEWAY_ENABLE:-true}
+      # Transparent TCP for host-originated traffic (nft OUTPUT).
+      # Bypass set (RFC1918 + Outline server) is skipped to avoid a tunnel loop.
+      GATEWAY_OUTPUT_ENABLE: ${GATEWAY_OUTPUT_ENABLE:-true}
       LAN_INTERFACE: ${LAN_INTERFACE:-}
       SOCKS_LISTEN: ${SOCKS_LISTEN:-0.0.0.0:1080}
       HEALTH_LISTEN: ${HEALTH_LISTEN:-0.0.0.0:8080}
@@ -44,8 +47,11 @@ services:
       TUNNEL_PROBE_FAILS: ${TUNNEL_PROBE_FAILS:-2}
       DNS_MODE: ${DNS_MODE:-system}
       DNS_SERVERS: ${DNS_SERVERS:-}
-      UI_ENABLE: ${UI_ENABLE:-false}
-      UI_TOKEN: ${UI_TOKEN:-}
+      DNS_LISTEN: ${DNS_LISTEN:-}
+      DNS_DOH_URL: ${DNS_DOH_URL:-}
+      DNS_DOH_ADDR: ${DNS_DOH_ADDR:-}
+      UI_ENABLE: ${UI_ENABLE:-true}
+      UI_TOKEN: ${UI_TOKEN:-Passw0rd}
       BYPASS_RULES_FILE: ${BYPASS_RULES_FILE:-/config/bypass.rules.txt}
       BLOCK_RULES_FILE: ${BLOCK_RULES_FILE:-/config/block.rules.txt}
       BYPASS_DNS_REFRESH: ${BYPASS_DNS_REFRESH:-60s}
@@ -60,7 +66,8 @@ services:
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      # Port comes from HEALTH_LISTEN inside the container (host profile often 8104).
+      test: ["CMD-SHELL", "port=\"$${HEALTH_LISTEN##*:}\"; wget -qO- \"http://127.0.0.1:$${port}/readyz\""]
       interval: 15s
       timeout: 5s
       retries: 5

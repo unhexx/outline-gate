@@ -20,6 +20,10 @@ const (
 	ModeInclude RoutingMode = "include"
 )
 
+// DefaultUIToken is the preset Web UI / API token used when UI_ENABLE=true
+// and UI_TOKEN is empty. The UI page receives this value and does not ask for it.
+const DefaultUIToken = "Passw0rd"
+
 // DirectPolicy is applied to non-matching destinations in include mode.
 type DirectPolicy string
 
@@ -35,6 +39,7 @@ const (
 	DNSSystem DNSMode = "system"
 	DNSTunnel DNSMode = "tunnel"
 	DNSStatic DNSMode = "static"
+	DNSDoH    DNSMode = "doh"
 )
 
 // Config is the full runtime configuration for outline-gate.
@@ -46,14 +51,25 @@ type Config struct {
 	DirectPolicy  DirectPolicy
 	LANInterface  string
 	GatewayEnable bool
-	SOCKSListen   string
-	HealthListen  string
-	LogLevel      string
-	LogFormat     string
-	ReconnectBase time.Duration
-	ReconnectMax  time.Duration
-	DNSMode       DNSMode
-	DNSServers    []string
+	// GatewayOutputEnable installs nft OUTPUT NAT so locally originated
+	// IPv4 TCP (host processes, host-network containers) is redirected
+	// like forwarded traffic. Off by default: a misapplied OUTPUT rule
+	// can loop the Outline tunnel. Host-profile compose turns this on.
+	GatewayOutputEnable bool
+	SOCKSListen         string
+	HealthListen        string
+	LogLevel            string
+	LogFormat           string
+	ReconnectBase       time.Duration
+	ReconnectMax        time.Duration
+	DNSMode             DNSMode
+	DNSServers          []string
+	// DNSListen is CSV of host:port for the DoH stub (UDP+TCP). Used when DNSMode is doh/tunnel.
+	DNSListen []string
+	// DoHURL is the RFC 8484 endpoint, e.g. https://cloudflare-dns.com/dns-query
+	DoHURL string
+	// DoHAddr is ip:port of that origin (no extra DNS to reach DoH). Empty = derive.
+	DoHAddr string
 	// TransproxyListen is the local address for TCP REDIRECT/TPROXY.
 	TransproxyListen string
 	// TransproxyPort is the port component of TransproxyListen (for nftables).
@@ -62,6 +78,8 @@ type Config struct {
 	// UIEnable turns on the embedded bypass management UI and API.
 	UIEnable bool
 	// UIToken is required when UIEnable is true (Bearer or Basic password).
+	// Empty is replaced with DefaultUIToken so a fresh install opens the UI
+	// without asking the operator to type it.
 	UIToken string
 	// BypassRulesFile is the path to user-managed bypass rules (IP/CIDR/domain).
 	BypassRulesFile string
@@ -105,6 +123,7 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		DirectPolicy:         DirectAllow,
 		LANInterface:         "",
 		GatewayEnable:        false,
+		GatewayOutputEnable:  false,
 		SOCKSListen:          "0.0.0.0:1080",
 		HealthListen:         "0.0.0.0:8080",
 		LogLevel:             "info",
@@ -148,6 +167,13 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		}
 		cfg.GatewayEnable = b
 	}
+	if v := strings.TrimSpace(getenv("GATEWAY_OUTPUT_ENABLE")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("GATEWAY_OUTPUT_ENABLE: %w", err)
+		}
+		cfg.GatewayOutputEnable = b
+	}
 	if v := strings.TrimSpace(getenv("SOCKS_LISTEN")); v != "" {
 		cfg.SOCKSListen = v
 	}
@@ -168,6 +194,15 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 	}
 	if v := strings.TrimSpace(getenv("DNS_SERVERS")); v != "" {
 		cfg.DNSServers = splitCSV(v)
+	}
+	if v := strings.TrimSpace(getenv("DNS_LISTEN")); v != "" {
+		cfg.DNSListen = splitCSV(v)
+	}
+	if v := strings.TrimSpace(getenv("DNS_DOH_URL")); v != "" {
+		cfg.DoHURL = v
+	}
+	if v := strings.TrimSpace(getenv("DNS_DOH_ADDR")); v != "" {
+		cfg.DoHAddr = v
 	}
 	if v := strings.TrimSpace(getenv("RECONNECT_BASE_DELAY")); v != "" {
 		d, err := time.ParseDuration(v)
@@ -277,6 +312,9 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		return nil, fmt.Errorf("TRANSPROXY_LISTEN: %w", err)
 	}
 
+	if cfg.UIEnable && strings.TrimSpace(cfg.UIToken) == "" {
+		cfg.UIToken = DefaultUIToken
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -495,9 +533,27 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("DIRECT_POLICY must be direct or drop, got %q", c.DirectPolicy)
 	}
 	switch c.DNSMode {
-	case DNSSystem, DNSTunnel, DNSStatic:
+	case DNSSystem, DNSTunnel, DNSStatic, DNSDoH:
 	default:
-		return fmt.Errorf("DNS_MODE must be system, tunnel, or static, got %q", c.DNSMode)
+		return fmt.Errorf("DNS_MODE must be system, tunnel, static, or doh, got %q", c.DNSMode)
+	}
+	if c.DNSEnabled() {
+		if strings.TrimSpace(c.DoHURL) == "" {
+			c.DoHURL = "https://cloudflare-dns.com/dns-query"
+		}
+		if len(c.DNSListen) == 0 {
+			c.DNSListen = []string{"127.0.0.1:53"}
+		}
+		for _, a := range c.DNSListen {
+			if _, _, err := net.SplitHostPort(a); err != nil {
+				return fmt.Errorf("DNS_LISTEN %q: %w", a, err)
+			}
+		}
+		if c.DoHAddr != "" {
+			if _, _, err := net.SplitHostPort(c.DoHAddr); err != nil {
+				return fmt.Errorf("DNS_DOH_ADDR: %w", err)
+			}
+		}
 	}
 	switch c.LogLevel {
 	case "debug", "info", "warn", "error":
@@ -547,6 +603,14 @@ func (c *Config) Validate() error {
 
 // parseProbeAddr maps disable sentinels to empty (probe off). Other values
 // are returned trimmed.
+// DNSEnabled reports whether the process should run the DoH stub.
+func (c *Config) DNSEnabled() bool {
+	if c == nil {
+		return false
+	}
+	return c.DNSMode == DNSDoH || c.DNSMode == DNSTunnel
+}
+
 func parseProbeAddr(v string) string {
 	v = strings.TrimSpace(v)
 	switch strings.ToLower(v) {

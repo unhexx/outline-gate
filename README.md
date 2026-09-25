@@ -579,34 +579,33 @@ Details: [`docs/routing.md`](docs/routing.md).
   <img src="docs/images/webui-mockup.svg" alt="outline-gate Web UI mockup" width="720"/>
 </p>
 
-### Sign-in: no default login/password
+### Sign-in
 
-**There is no separate login/password** and **no default credentials** (`admin` / `password` do not exist).
+There is no separate login. The Web UI is on by default and uses the preset token **`Passw0rd`**. After install, open `/ui/` — the token field is hidden and API calls are already authorized.
 
 | | Default |
 |--|---------|
-| Web UI | **off** (`UI_ENABLE=false`) |
+| Web UI | **on** (`UI_ENABLE=true`) |
 | Login | **not used** |
-| Password / token | **you set** `UI_TOKEN` |
+| Token | **`Passw0rd`** (`UI_TOKEN`; empty becomes this preset) |
 
 ```bash
 # deploy/compose/.env
 UI_ENABLE=true
-UI_TOKEN=your-long-random-secret
+UI_TOKEN=Passw0rd
 HOST_HEALTH_PORT=28080
 ```
 
 ```bash
-openssl rand -hex 24   # → UI_TOKEN
 docker compose up -d --force-recreate
-# http://127.0.0.1:28080/ui/  → "Access token" = UI_TOKEN
+# http://127.0.0.1:28080/ui/  — token is applied by the page
 ```
 
 **API auth**
 
 | Method | How |
 |--------|-----|
-| UI form | `UI_TOKEN` → sessionStorage → `Authorization: Bearer …` |
+| Web UI | server embeds `UI_TOKEN`; the browser sends `Authorization: Bearer …` |
 | curl | `Authorization: Bearer <UI_TOKEN>` |
 | HTTP Basic | any username (`admin`), **password** = `UI_TOKEN` |
 
@@ -686,7 +685,7 @@ docker run --rm -d --name outline-gate \
   -e ROUTING_MODE=exclude \
   -e GATEWAY_ENABLE=false \
   -e UI_ENABLE=true \
-  -e UI_TOKEN='change-me' \
+  -e UI_TOKEN='Passw0rd' \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
   outline-gate:local
@@ -697,7 +696,7 @@ docker run --rm -d --name outline-gate \
 ## Best practices
 
 1. **Secrets** — `.env` / secrets / UI persist file; never git, never the image.
-2. **UI_TOKEN** — long random; keep UI/API off the public internet without a TLS reverse-proxy.
+2. **UI_TOKEN** — preset `Passw0rd` (the UI embeds it). Keep the health/UI port on a trusted network.
 3. **SOCKS `:1080`** — LAN / localhost only; no SOCKS auth in v1.
 4. **L3** — always auto-bypass the Outline server IP; re-check after a key change.
 5. **Domains on L3** — best-effort; use SOCKS for exact hostname match.

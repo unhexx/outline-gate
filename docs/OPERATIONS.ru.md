@@ -112,7 +112,7 @@ COMPOSE_PROFILE=socks    # socks | host (для install.sh)
 HOST_SOCKS_PORT=1080
 HOST_HEALTH_PORT=28080   # health + Web UI на хосте
 UI_ENABLE=true
-UI_TOKEN=длинный-случайный-секрет
+UI_TOKEN=Passw0rd
 # SOCKS_ALLOW_CIDRS=192.168.0.0/16,10.0.0.0/8,127.0.0.0/8
 LOG_LEVEL=info
 ```
@@ -162,7 +162,7 @@ docker run --rm -d --name outline-gate \
   -e ROUTING_MODE=exclude \
   -e GATEWAY_ENABLE=false \
   -e UI_ENABLE=true \
-  -e UI_TOKEN='change-me' \
+  -e UI_TOKEN='Passw0rd' \
   -e LOG_LEVEL=info \
   -p 1080:1080 -p 28080:8080 \
   -v "$PWD/deploy/compose/config:/config" \
@@ -331,7 +331,7 @@ curl -s "http://127.0.0.1:${HOST_HEALTH_PORT:-28080}/metrics" | head
 
 ```bash
 UI_ENABLE=true
-UI_TOKEN=длинный-случайный-секрет
+UI_TOKEN=Passw0rd
 HOST_HEALTH_PORT=28080   # любой свободный порт хоста → контейнер :8080
 ```
 
@@ -345,7 +345,7 @@ docker compose up --build -d
 http://IP-хоста:28080/ui/
 ```
 
-Введите `UI_TOKEN`. В интерфейсе:
+Интерфейс сам подставляет `UI_TOKEN` и не просит его вводить. В интерфейсе:
 
 1. **Ключ Outline** — вставка `ss://` / `ssconf://`, «Заменить ключ» (reconnect + запись в `OUTLINE_KEY_PERSIST_FILE`).
 2. **Bypass** — IP / CIDR / домен / `*.suffix`.
@@ -535,7 +535,7 @@ cd deploy/compose
 - Не коммитьте `.env` и реальные ключи.
 - Ключ в логах редактируется (`ss://***@host:port`).
 - Ограничьте доступ к `:8080`, если не нужен снаружи.
-- При `UI_ENABLE=true` обязательно задайте сильный `UI_TOKEN`; API без токена отвечает 401. UI-страница публична (секретов нет), данные меняются только через API с токеном.
+- При `UI_ENABLE=true` токен по умолчанию — `Passw0rd`, если `UI_TOKEN` не задан. API без этого токена отвечает 401. Страница `/ui/` содержит токен, чтобы браузер ходил в API; не публикуйте порт health/UI в интернет.
 
 ### 8.6. Типовые проблемы
 
