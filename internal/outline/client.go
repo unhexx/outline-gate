@@ -42,6 +42,12 @@ type Client struct {
 	failCount   atomic.Int32
 
 	wake chan struct{}
+	// slots caps simultaneous tunnel dials so a dead server cannot fill
+	// the host conntrack table with SYN retries.
+	slots chan struct{}
+
+	// OnUnready runs once when the tunnel is marked not ready.
+	OnUnready func()
 
 	providers *configurl.ProviderContainer
 	expand    func(ctx context.Context, key string) (string, error)
@@ -112,6 +118,7 @@ func New(opts Options) (*Client, error) {
 		serverIP:      ip,
 		providers:     providers,
 		wake:          make(chan struct{}, 1),
+		slots:         make(chan struct{}, 8),
 		expand:        ExpandAccessKey,
 	}
 	c.newDialer = func(ctx context.Context, key string) (transport.StreamDialer, error) {
@@ -185,11 +192,8 @@ func (c *Client) AccessKey() string {
 // if Connect fails, ready is false and the new key is kept for retry.
 func (c *Client) SetAccessKey(ctx context.Context, accessKey string) error {
 	accessKey = strings.TrimSpace(accessKey)
-	if accessKey == "" {
-		return fmt.Errorf("access key is required")
-	}
-	if !strings.HasPrefix(accessKey, "ss://") && !strings.HasPrefix(accessKey, "ssconf://") {
-		return fmt.Errorf("access key must start with ss:// or ssconf://")
+	if err := validateKey(accessKey); err != nil {
+		return err
 	}
 	c.mu.Lock()
 	c.accessKey = accessKey
@@ -207,10 +211,17 @@ func (c *Client) DialContext(ctx context.Context, network, address string) (net.
 	if network != "tcp" && network != "tcp4" && network != "tcp6" {
 		return nil, fmt.Errorf("unsupported network %q (tcp only in v1)", network)
 	}
+	if !c.ready.Load() {
+		return nil, fmt.Errorf("outline dialer not ready")
+	}
+	if err := c.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer c.release()
 	c.mu.RLock()
 	d := c.dialer
 	c.mu.RUnlock()
-	if d == nil {
+	if d == nil || !c.ready.Load() {
 		return nil, fmt.Errorf("outline dialer not ready")
 	}
 	sc, err := d.DialStream(ctx, address)
@@ -239,6 +250,9 @@ func (c *Client) noteTunnelFailure() {
 		if c.ready.Swap(false) {
 			c.log().Warn("outline tunnel marked not ready after consecutive dial failures",
 				"failures", n, "threshold", c.failThreshold(), "server", c.endpointLocked())
+			if c.OnUnready != nil {
+				c.OnUnready()
+			}
 			c.kick()
 		}
 	}
@@ -270,6 +284,62 @@ func (c *Client) isTransportFailure(err error) bool {
 		return true
 	}
 	return strings.Contains(msg, "i/o timeout")
+}
+
+func (c *Client) acquire(ctx context.Context) error {
+	if c.slots == nil {
+		return nil
+	}
+	select {
+	case c.slots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (c *Client) release() {
+	if c.slots == nil {
+		return
+	}
+	select {
+	case <-c.slots:
+	default:
+	}
+}
+
+// Reconnect rebuilds the dialer and, when a probe target is set, checks it
+// before reporting success.
+func (c *Client) Reconnect(ctx context.Context) error {
+	c.ready.Store(false)
+	c.failCount.Store(0)
+	if err := c.Connect(ctx); err != nil {
+		c.kick()
+		return err
+	}
+	if c.probeAddr != "" {
+		if err := c.probe(ctx); err != nil {
+			c.ready.Store(false)
+			c.kick()
+			return err
+		}
+	}
+	c.kick()
+	return nil
+}
+
+func validateKey(accessKey string) error {
+	accessKey = strings.TrimSpace(accessKey)
+	if accessKey == "" {
+		return fmt.Errorf("access key is required")
+	}
+	if strings.Contains(accessKey, "***") || strings.ContainsAny(accessKey, " \t\r\n") {
+		return fmt.Errorf("access key looks redacted or copied from the status line")
+	}
+	if !strings.HasPrefix(accessKey, "ss://") && !strings.HasPrefix(accessKey, "ssconf://") {
+		return fmt.Errorf("access key must start with ss:// or ssconf://")
+	}
+	return nil
 }
 
 func (c *Client) kick() {

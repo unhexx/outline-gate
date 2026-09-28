@@ -11,7 +11,7 @@
 
 <p align="center"><a href="README.md">English</a> · <strong>Русский</strong></p>
 
-**Текущий релиз: [v0.6.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Бинарник `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
+**Текущий релиз: [v0.7.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Бинарник `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
 
 ## О продукте
 
@@ -199,7 +199,7 @@ fi
 | Канал | Ссылка |
 |-------|--------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
-| Latest tag | [`v0.6.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) |
+| Latest tag | [`v0.7.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.7.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Module path | `github.com/unhexx/outline-gate` |
 | Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (ветка `master`, tag `v0.6.0`) |
@@ -215,14 +215,14 @@ cd outline-gate
 Образ с меткой релиза:
 
 ```bash
-docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.6.0 -t outline-gate:v0.6.0 .
+docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.7.0 -t outline-gate:v0.7.0 .
 ```
 
 ### Бинарник Linux amd64
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.7.0/outline-gate_linux_amd64
 chmod +x outline-gate
 export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate

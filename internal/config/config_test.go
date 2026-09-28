@@ -284,6 +284,32 @@ func TestParseCIDROrIP(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnv_InvalidPersistFallsBack(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "outline_key.runtime.txt")
+	poisoned := "ss://***@66.90.90.98:11089#jp · ready: нет · server: 66.90.90.98 · persist: /config/outline_key.runtime.txt\n"
+	if err := os.WriteFile(path, []byte(poisoned), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY":       "ss://good@1.1.1.1:1",
+		"OUTLINE_KEY_PERSIST_FILE": path,
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AccessKey != "ss://good@1.1.1.1:1" {
+		t.Fatalf("key %q", cfg.AccessKey)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("poisoned persist file should be moved aside")
+	}
+	if _, err := os.Stat(path + ".invalid"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPersistAccessKey(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "key.runtime.txt")
@@ -299,6 +325,10 @@ func TestPersistAccessKey(t *testing.T) {
 	}
 	if err := PersistAccessKey(path, ""); err == nil {
 		t.Fatal("empty key should fail")
+	}
+	poisoned := "ss://***@1.2.3.4:1 · ready: нет"
+	if err := PersistAccessKey(path, poisoned); err == nil {
+		t.Fatal("redacted status line must not be stored")
 	}
 }
 

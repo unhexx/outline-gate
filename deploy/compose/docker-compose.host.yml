@@ -16,6 +16,7 @@ services:
     network_mode: host
     cap_add:
       - NET_ADMIN
+      - SYS_ADMIN
     env_file:
       - path: .env
         required: false
@@ -63,6 +64,7 @@ services:
       SOCKS_ALLOW_CIDRS_FILE: ${SOCKS_ALLOW_CIDRS_FILE:-}
     volumes:
       - ./config:/config
+      - /proc/1/ns/net:/host/netns:ro
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro
     restart: unless-stopped
     healthcheck:

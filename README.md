@@ -11,7 +11,7 @@
 
 <p align="center"><strong>English</strong> · <a href="README.ru.md">Русский</a></p>
 
-**Current release: [v0.6.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
+**Current release: [v0.7.0](https://github.com/unhexx/outline-gate/releases/latest)** · [Changelog](CHANGELOG.md) · [Binary `linux/amd64`](https://github.com/unhexx/outline-gate/releases/latest/download/outline-gate_linux_amd64)
 
 ## About
 
@@ -199,7 +199,7 @@ In a browser: SOCKS5 + **DNS through SOCKS**. In the UI log a successful check i
 | Channel | Link |
 |---------|------|
 | GitHub Releases | https://github.com/unhexx/outline-gate/releases |
-| Latest tag | [`v0.6.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.6.0) |
+| Latest tag | [`v0.7.0`](https://github.com/unhexx/outline-gate/releases/tag/v0.7.0) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | Module path | `github.com/unhexx/outline-gate` |
 | Internal git | `https://git.aservice24.ru/scm/expert/outline-gate.git` (branch `master`, tag `v0.6.0`) |
@@ -215,14 +215,14 @@ cd outline-gate
 Image with the release tag:
 
 ```bash
-docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.6.0 -t outline-gate:v0.6.0 .
+docker build -f deploy/docker/Dockerfile --build-arg VERSION=0.7.0 -t outline-gate:v0.7.0 .
 ```
 
 ### Linux amd64 binary
 
 ```bash
 curl -fsSL -o outline-gate \
-  https://github.com/unhexx/outline-gate/releases/download/v0.6.0/outline-gate_linux_amd64
+  https://github.com/unhexx/outline-gate/releases/download/v0.7.0/outline-gate_linux_amd64
 chmod +x outline-gate
 export OUTLINE_ACCESS_KEY='ss://...'
 ./outline-gate

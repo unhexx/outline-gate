@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+# A previous process may have left outline_gate rules in this netns or, when
+# /host/netns is mounted, in the host netns. Container restart does not drop them.
+if [ -e /host/netns ] && command -v nsenter >/dev/null 2>&1 && command -v nft >/dev/null 2>&1; then
+  printf 'delete table inet outline_gate\n' | nsenter --net=/host/netns nft -f - >/dev/null 2>&1 || true
+fi
+if command -v nft >/dev/null 2>&1; then
+  printf 'delete table inet outline_gate\n' | nft -f - >/dev/null 2>&1 || true
+fi
+
 # Enable IPv4 forwarding when possible (host network / privileged).
 if [ -w /proc/sys/net/ipv4/ip_forward ] 2>/dev/null; then
   # ignore errors (read-only sysctl in many containers)

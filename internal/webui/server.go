@@ -43,6 +43,10 @@ type Server struct {
 	Version string
 	Token   string
 	Static  fs.FS // usually //go:embed static
+	// RestartServices reconnects Outline and clears host conntrack for its server.
+	RestartServices func(rctx context.Context) (string, error)
+	// RestartContainer asks the process to exit so Docker restarts the container.
+	RestartContainer func()
 }
 
 // Mount registers UI and API routes on mux. Health routes stay separate.
@@ -77,6 +81,7 @@ func (s *Server) Mount(mux *http.ServeMux) {
 		mux.Handle("/api/v1/connections/", tokenAuth(s.Token, connAPI))
 	}
 	mux.Handle("/api/v1/status", tokenAuth(s.Token, http.HandlerFunc(s.handleStatus)))
+	mux.Handle("/api/v1/restart", tokenAuth(s.Token, http.HandlerFunc(s.handleRestart)))
 
 	var static http.Handler
 	if s.Static != nil {

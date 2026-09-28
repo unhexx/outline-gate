@@ -22,6 +22,7 @@ import (
 	"github.com/unhexx/outline-gate/internal/health"
 	"github.com/unhexx/outline-gate/internal/logging"
 	"github.com/unhexx/outline-gate/internal/metrics"
+	"github.com/unhexx/outline-gate/internal/netrecover"
 	"github.com/unhexx/outline-gate/internal/outline"
 	"github.com/unhexx/outline-gate/internal/proxy"
 	"github.com/unhexx/outline-gate/internal/routing"
@@ -75,6 +76,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	client.OnUnready = func() {
+		log.Warn("outline path stalled; clearing host conntrack", "server_ip", client.ServerIP())
+		netrecover.ClearPath(client.ServerIP())
+	}
+	// Drop nft/conntrack left by a previous process. A container restart does
+	// not clear the host network namespace.
+	netrecover.FlushStaleNAT()
+	netrecover.ClearPath(client.ServerIP())
 
 	cctx, ccancel := context.WithTimeout(ctx, 30*time.Second)
 	err = client.Connect(cctx)
@@ -216,6 +225,34 @@ func run() error {
 			Version: version.String(),
 			Token:   cfg.UIToken,
 			Static:  webui.StaticFS(),
+			RestartServices: func(rctx context.Context) (string, error) {
+				netrecover.ClearPath(client.ServerIP())
+				if err := client.Reconnect(rctx); err != nil {
+					if fresh, lerr := config.Load(); lerr == nil && fresh.AccessKey != client.AccessKey() {
+						if serr := client.SetAccessKey(rctx, fresh.AccessKey); serr == nil {
+							err = nil
+						}
+					}
+					if err != nil {
+						return "", err
+					}
+				}
+				mu.Lock()
+				g := gw
+				mu.Unlock()
+				if g != nil {
+					if gerr := g.Apply(); gerr != nil {
+						log.Error("gateway reapply after service restart", "err", gerr)
+						return "туннель поднят, nft не применился: " + gerr.Error(), nil
+					}
+				}
+				log.Info("services restarted from UI", "server_ip", client.ServerIP(), "ready", client.Ready())
+				return "службы перезапущены", nil
+			},
+			RestartContainer: func() {
+				log.Info("container restart requested from UI")
+				cancel()
+			},
 		}
 		ui.Mount(mux)
 		log.Info("management UI enabled", "path", "/ui/", "key_persist", cfg.AccessKeyPersistFile)

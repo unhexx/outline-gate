@@ -66,6 +66,12 @@
             <div class="stat"><span class="stat-label">1 мин</span><span class="stat-value" id="st-rates">—</span></div>
           </div>
           <p class="hint" id="status-hint">Вкладка <strong>Лог</strong> — VPN vs Direct в реальном времени.</p>
+          <div class="row" style="margin-top:0.45rem">
+            <button type="button" id="btn-restart-services">Перезапустить службы</button>
+            <button type="button" id="btn-restart-container" class="ghost">Перезапустить контейнер</button>
+          </div>
+          <p class="hint">Службы — туннель и conntrack хоста. Контейнер — полный рестарт процесса (Docker поднимет его снова).</p>
+          <p id="restart-msg" class="hint" hidden></p>
           <p id="status-error" class="error" hidden></p>
         </div>
       </section>

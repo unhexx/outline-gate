@@ -274,6 +274,39 @@ func TestVersionEndpointPublic(t *testing.T) {
 	}
 }
 
+func TestRestartRequiresAuth(t *testing.T) {
+	called := false
+	srv := &Server{
+		Token: "secret",
+		RestartServices: func(context.Context) (string, error) {
+			called = true
+			return "ok", nil
+		},
+	}
+	mux := http.NewServeMux()
+	srv.Mount(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/restart", strings.NewReader(`{"scope":"services"}`)))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", rr.Code)
+	}
+	if called {
+		t.Fatal("handler ran without token")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/restart", strings.NewReader(`{"scope":"services"}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("restart: %d %s", rr.Code, rr.Body.String())
+	}
+	if !called || !strings.Contains(rr.Body.String(), `"ok":true`) {
+		t.Fatalf("body %s called %v", rr.Body.String(), called)
+	}
+}
+
 func TestUIIndexEmbedsPresetToken(t *testing.T) {
 	token := `p@ss</script>"'`
 	srv := &Server{Token: token, Static: StaticFS()}

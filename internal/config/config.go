@@ -329,7 +329,13 @@ func loadAccessKey(getenv func(string) string) (string, error) {
 	}
 	if b, err := os.ReadFile(persistPath); err == nil {
 		if key := firstNonCommentLine(string(b)); key != "" {
-			return key, nil
+			if err := ValidateAccessKey(key); err != nil {
+				// Keep the bad file for inspection, but do not let it shadow
+				// OUTLINE_ACCESS_KEY across restarts.
+				_ = os.Rename(persistPath, persistPath+".invalid")
+			} else {
+				return key, nil
+			}
 		}
 	}
 
@@ -357,8 +363,8 @@ func PersistAccessKey(path, key string) error {
 	if path == "" {
 		return fmt.Errorf("persist path is empty")
 	}
-	if key == "" {
-		return fmt.Errorf("access key is empty")
+	if err := ValidateAccessKey(key); err != nil {
+		return err
 	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

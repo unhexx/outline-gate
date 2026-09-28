@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.26-alpine AS build
-ARG VERSION=0.6.0
+ARG VERSION=0.7.0
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
 
 FROM alpine:3.21
 # Soft-pin nftables major.minor to avoid silent breaking upgrades on rebuild.
-RUN apk add --no-cache ca-certificates nftables=~1.1 iproute2 wget
+RUN apk add --no-cache ca-certificates nftables=~1.1 iproute2 wget conntrack-tools util-linux
 COPY --from=build /out/outline-gate /usr/local/bin/outline-gate
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

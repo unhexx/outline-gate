@@ -36,6 +36,9 @@
     stGw: document.getElementById("st-gw"),
     stRates: document.getElementById("st-rates"),
     statusError: document.getElementById("status-error"),
+    restartServices: document.getElementById("btn-restart-services"),
+    restartContainer: document.getElementById("btn-restart-container"),
+    restartMsg: document.getElementById("restart-msg"),
     logList: document.getElementById("log-list"),
     logEmpty: document.getElementById("log-empty"),
     logSearch: document.getElementById("log-search"),
@@ -625,6 +628,40 @@
       }
     });
   }
+  function showRestart(msg) {
+    if (!el.restartMsg) return;
+    el.restartMsg.hidden = !msg;
+    el.restartMsg.textContent = msg || "";
+  }
+
+  async function restart(scope) {
+    const ask = scope === "container"
+      ? "Перезапустить контейнер outline-gate? На несколько секунд пропадёт SOCKS и UI."
+      : "Перезапустить туннель и сбросить зависшие соединения к серверу Outline?";
+    if (!confirm(ask)) return;
+    showRestart("…");
+    try {
+      const res = await api("/api/v1/restart", {
+        method: "POST",
+        body: JSON.stringify({ scope }),
+      });
+      showRestart((res && res.message) || "готово");
+      if (scope === "container") {
+        setTimeout(() => loadAll(), 4000);
+      } else {
+        await loadAll();
+      }
+    } catch (e) {
+      showRestart("");
+      if (el.statusError) {
+        el.statusError.hidden = false;
+        el.statusError.textContent = e.message;
+      }
+    }
+  }
+  if (el.restartServices) el.restartServices.addEventListener("click", () => restart("services"));
+  if (el.restartContainer) el.restartContainer.addEventListener("click", () => restart("container"));
+
   el.form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     showError("");

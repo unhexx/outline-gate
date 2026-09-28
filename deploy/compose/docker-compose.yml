@@ -20,6 +20,8 @@ services:
     container_name: outline-gate
     cap_add:
       - NET_ADMIN
+      # nsenter into the host netns to drop conntrack that survives a container restart
+      - SYS_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
     networks:
@@ -72,6 +74,7 @@ services:
     volumes:
       # rw: UI/API пишет bypass.rules.txt; static CIDR-файлы тоже здесь
       - ./config:/config
+      - /proc/1/ns/net:/host/netns:ro
       # Опциональный файл ключа (создайте через configure.sh или вручную).
       # Если используете только OUTLINE_ACCESS_KEY в .env — файл может быть пустым-заглушкой.
       - ${OUTLINE_KEY_HOST_PATH:-./secrets/outline_key.txt}:/run/secrets/outline_key:ro

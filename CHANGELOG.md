@@ -12,6 +12,19 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-28
+
+### Added
+
+- Web UI buttons **Перезапустить службы** and **Перезапустить контейнер** (`POST /api/v1/restart`)
+- On tunnel failure, clear host conntrack for the Outline server (`/host/netns`). A container restart alone left those entries in place
+
+### Fixed
+
+- A key copied from the status line (`ss://***@… · ready: …`) is rejected and no longer shadows `OUTLINE_ACCESS_KEY` after restart
+- While the tunnel is down, new dials fail immediately instead of filling the host conntrack table with SYN retries
+- Startup removes a leftover `outline_gate` nft table in the host netns
+
 ### Changed
 
 - Web UI applies the configured `UI_TOKEN` by itself. The token field is hidden. Empty token with `UI_ENABLE=true` becomes the preset `Passw0rd` (compose, `.env.example`, `install.sh`)
