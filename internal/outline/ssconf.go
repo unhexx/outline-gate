@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/unhexx/outline-gate/internal/netdns"
 )
 
 // outlineJSON is the JSON body served by ssconf:// endpoints (Outline dynamic keys).
@@ -90,7 +92,18 @@ func expandDynamic(ctx context.Context, key string) (string, error) {
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("User-Agent", "outline-gate/1.0")
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	client := &http.Client{
+		Timeout: 20 * time.Second,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           netdns.Dialer().DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          4,
+			IdleConnTimeout:       30 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("ssconf fetch: %w", err)

@@ -8,7 +8,7 @@ import "strings"
 
 // Version is the release version without a leading "v" (semver).
 // Default is updated for each release; Docker/Makefile set it via -ldflags.
-var Version = "0.7.0"
+var Version = "0.7.1"
 
 // String returns a display form with a leading "v" (e.g. "v0.6.0").
 func String() string {

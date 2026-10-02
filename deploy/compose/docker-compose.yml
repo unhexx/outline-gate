@@ -13,6 +13,16 @@ name: outline-gate
 
 services:
   outline-gate:
+    # Bypass Docker 127.0.0.11: ssconf fetch and Direct bypass break when it
+    # returns SERVFAIL / timeout (browser sites then fail with "dialer not ready").
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+      - 77.88.8.8
+    dns_opt:
+      - ndots:1
+      - timeout:2
+      - attempts:2
     image: ${IMAGE_TAG:-outline-gate:local}
     build:
       context: ../..

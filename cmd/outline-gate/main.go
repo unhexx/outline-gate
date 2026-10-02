@@ -22,6 +22,7 @@ import (
 	"github.com/unhexx/outline-gate/internal/health"
 	"github.com/unhexx/outline-gate/internal/logging"
 	"github.com/unhexx/outline-gate/internal/metrics"
+	"github.com/unhexx/outline-gate/internal/netdns"
 	"github.com/unhexx/outline-gate/internal/netrecover"
 	"github.com/unhexx/outline-gate/internal/outline"
 	"github.com/unhexx/outline-gate/internal/proxy"
@@ -62,6 +63,10 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	expandedPersist := ""
+	if p := strings.TrimSpace(cfg.AccessKeyPersistFile); p != "" {
+		expandedPersist = p + ".expanded"
+	}
 	client, err := outline.New(outline.Options{
 		AccessKey:       cfg.AccessKey,
 		ReconnectBase:   cfg.ReconnectBase,
@@ -72,6 +77,15 @@ func run() error {
 		ProbeFails:      cfg.ProbeFails,
 		RefreshInterval: cfg.SSConfRefresh,
 		Logger:          log,
+		LastExpanded:    config.ReadPersistedKey(expandedPersist),
+		OnExpanded: func(ss string) {
+			if expandedPersist == "" {
+				return
+			}
+			if err := config.PersistAccessKey(expandedPersist, ss); err != nil {
+				log.Warn("persist expanded key", "err", err)
+			}
+		},
 	})
 	if err != nil {
 		return err
@@ -126,6 +140,7 @@ func run() error {
 	bypassMgr = bypass.NewManager(bypass.Options{
 		Store:        bypass.NewStore(cfg.BypassRulesFile),
 		StaticBypass: cfg.BypassCIDRs,
+		LookupIP:     netdns.LookupIP,
 		Logger:       log,
 		RefreshEvery: cfg.BypassDNSRefresh,
 		OnChange:     rebuildPush,
@@ -137,6 +152,7 @@ func run() error {
 
 	blockMgr := bypass.NewManager(bypass.Options{
 		Store:        bypass.NewStore(cfg.BlockRulesFile),
+		LookupIP:     netdns.LookupIP,
 		Logger:       log,
 		RefreshEvery: cfg.BypassDNSRefresh,
 	})
@@ -322,14 +338,16 @@ func run() error {
 		}()
 	}
 
+	directDial := netdns.Dialer()
 	socks := &proxy.SOCKS5{
-		ListenAddr: cfg.SOCKSListen,
-		Dialer:     client,
-		Bypass:     bypassMgr,
-		Block:      blockMgr,
-		AllowCIDRs: cfg.SOCKSAllowCIDRs,
-		ConnLog:    connHook,
-		Logger:     log,
+		ListenAddr:   cfg.SOCKSListen,
+		Dialer:       client,
+		DirectDialer: directDial,
+		Bypass:       bypassMgr,
+		Block:        blockMgr,
+		AllowCIDRs:   cfg.SOCKSAllowCIDRs,
+		ConnLog:      connHook,
+		Logger:       log,
 	}
 	wg.Add(1)
 	go func() {
@@ -343,7 +361,7 @@ func run() error {
 		tp := &proxy.Transparent{
 			ListenAddr:   cfg.TransproxyListen,
 			Dialer:       client,
-			DirectDialer: &net.Dialer{},
+			DirectDialer: directDial,
 			Decider: &proxy.EnginePathDecider{
 				Mu:     &mu,
 				Engine: func() *routing.Engine { return engine },

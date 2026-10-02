@@ -12,6 +12,14 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-02
+
+### Fixed
+
+- SOCKS sites failed with `outline dialer not ready` while `ssconf://` could not resolve on Docker DNS `127.0.0.11`. Reconnect now keeps the last working `ss://` key and fetches ssconf via public DNS.
+- Direct bypass (`*.max.ru` and similar) no longer uses `127.0.0.11` (`server misbehaving`); lookups go to 1.1.1.1 / 8.8.8.8.
+- Compose sets container `dns:` so the embedded Docker resolver is not the only nameserver.
+
 ## [0.7.0] — 2026-09-28
 
 ### Added

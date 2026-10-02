@@ -397,6 +397,19 @@ func PersistAccessKey(path, key string) error {
 	return nil
 }
 
+// ReadPersistedKey returns the first non-comment line of path, or "".
+func ReadPersistedKey(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return firstNonCommentLine(string(b))
+}
+
 func loadCIDRs(getenv func(string) string, envKey, fileKey string) ([]net.IPNet, error) {
 	var raw []string
 	if v := strings.TrimSpace(getenv(envKey)); v != "" {

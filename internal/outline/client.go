@@ -48,6 +48,8 @@ type Client struct {
 
 	// OnUnready runs once when the tunnel is marked not ready.
 	OnUnready func()
+	// OnExpanded is called with the static ss:// key after a successful rebuild.
+	OnExpanded func(ss string)
 
 	providers *configurl.ProviderContainer
 	expand    func(ctx context.Context, key string) (string, error)
@@ -72,6 +74,10 @@ type Options struct {
 	ProbeFails      int
 	RefreshInterval time.Duration
 	Logger          *slog.Logger
+	// LastExpanded is a previously fetched ss:// key used when ssconf://
+	// cannot be resolved (Docker DNS down).
+	LastExpanded string
+	OnExpanded   func(ss string)
 }
 
 // New creates a Client. Call Connect to establish the dialer.
@@ -120,6 +126,10 @@ func New(opts Options) (*Client, error) {
 		wake:          make(chan struct{}, 1),
 		slots:         make(chan struct{}, 8),
 		expand:        ExpandAccessKey,
+		OnExpanded:    opts.OnExpanded,
+	}
+	if last := strings.TrimSpace(opts.LastExpanded); strings.HasPrefix(last, "ss://") {
+		c.expandedKey = last
 	}
 	c.newDialer = func(ctx context.Context, key string) (transport.StreamDialer, error) {
 		return providers.NewStreamDialer(ctx, key)
@@ -147,9 +157,18 @@ func (c *Client) Ready() bool {
 func (c *Client) Connect(ctx context.Context) error {
 	c.mu.RLock()
 	accessKey := c.accessKey
+	prev := c.expandedKey
 	c.mu.RUnlock()
 	key, err := c.expand(ctx, accessKey)
 	if err != nil {
+		if prev != "" && strings.HasPrefix(prev, "ss://") {
+			c.log().Warn("ssconf expand failed; using last static key", "err", err)
+			if aerr := c.applyExpanded(ctx, prev); aerr != nil {
+				c.ready.Store(false)
+				return fmt.Errorf("outline expand key: %w", err)
+			}
+			return nil
+		}
 		c.ready.Store(false)
 		return fmt.Errorf("outline expand key: %w", err)
 	}
@@ -177,6 +196,9 @@ func (c *Client) applyExpanded(ctx context.Context, key string) error {
 	c.mu.Unlock()
 	c.failCount.Store(0)
 	c.ready.Store(true)
+	if c.OnExpanded != nil && strings.HasPrefix(key, "ss://") {
+		c.OnExpanded(key)
+	}
 	return nil
 }
 

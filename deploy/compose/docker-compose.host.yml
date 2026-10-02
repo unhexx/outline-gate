@@ -13,6 +13,10 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
     container_name: outline-gate
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+      - 77.88.8.8
     network_mode: host
     cap_add:
       - NET_ADMIN

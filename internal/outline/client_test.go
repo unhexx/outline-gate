@@ -85,6 +85,23 @@ func TestIsTransportFailureServerIP(t *testing.T) {
 	}
 }
 
+func TestConnect_ExpandFailUsesLastExpanded(t *testing.T) {
+	d := &fakeStreamDialer{}
+	c := testClient(t, "ssconf://provider.example/key", func(context.Context, string) (string, error) {
+		return "", fmt.Errorf("lookup connect.example on 127.0.0.11:53: i/o timeout")
+	}, d)
+	c.expandedKey = testSS1
+	if err := c.Connect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Ready() {
+		t.Fatal("should stay ready on last static key")
+	}
+	if ip := c.ServerIP(); ip == nil || ip.String() != "10.0.0.1" {
+		t.Fatalf("server ip %v", ip)
+	}
+}
+
 func TestNewRequiresKey(t *testing.T) {
 	_, err := New(Options{})
 	if err == nil {
