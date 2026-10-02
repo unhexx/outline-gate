@@ -3,6 +3,7 @@
 package proxy
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -163,60 +164,73 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 	}
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 
-	// greeting
-	buf := make([]byte, 258)
-	if _, err := io.ReadFull(conn, buf[:2]); err != nil {
+	br := bufio.NewReader(conn)
+	peek, err := br.Peek(1)
+	if err != nil {
 		return
 	}
-	if buf[0] != 0x05 {
+	pc := &prefixConn{Conn: conn, r: br}
+	// Chromium/KDE often set an HTTP proxy to the SOCKS port. First byte
+	// 0x05 is SOCKS5; 'C'/'G'/'P' is HTTP CONNECT/GET/POST.
+	if peek[0] != 0x05 {
+		s.handleHTTP(ctx, pc, clientIP, timeout)
+		return
+	}
+
+	// greeting
+	buf := make([]byte, 258)
+	if _, err := io.ReadFull(pc, buf[:2]); err != nil {
 		return
 	}
 	nmethods := int(buf[1])
-	if _, err := io.ReadFull(conn, buf[:nmethods]); err != nil {
+	if _, err := io.ReadFull(pc, buf[:nmethods]); err != nil {
 		return
 	}
 	// no auth
-	if _, err := conn.Write([]byte{0x05, 0x00}); err != nil {
+	if _, err := pc.Write([]byte{0x05, 0x00}); err != nil {
 		return
 	}
 
 	// request
-	if _, err := io.ReadFull(conn, buf[:4]); err != nil {
+	if _, err := io.ReadFull(pc, buf[:4]); err != nil {
 		return
 	}
 	if buf[0] != 0x05 || buf[1] != 0x01 { // CONNECT
-		_, _ = conn.Write([]byte{0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = pc.Write([]byte{0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 	var host string
 	switch buf[3] {
 	case 0x01: // IPv4
-		if _, err := io.ReadFull(conn, buf[:4]); err != nil {
+		if _, err := io.ReadFull(pc, buf[:4]); err != nil {
 			return
 		}
 		host = net.IP(buf[:4]).String()
 	case 0x03: // domain
-		if _, err := io.ReadFull(conn, buf[:1]); err != nil {
+		if _, err := io.ReadFull(pc, buf[:1]); err != nil {
 			return
 		}
 		l := int(buf[0])
-		if _, err := io.ReadFull(conn, buf[:l]); err != nil {
+		if _, err := io.ReadFull(pc, buf[:l]); err != nil {
 			return
 		}
 		host = string(buf[:l])
-	case 0x04: // IPv6 — not supported in v1 (IPv4-only)
-		if _, err := io.ReadFull(conn, buf[:16]); err != nil {
+	case 0x04: // IPv6: only v4-mapped (::ffff:a.b.c.d)
+		ip := make(net.IP, 16)
+		if _, err := io.ReadFull(pc, ip); err != nil {
 			return
 		}
-		log.Debug("SOCKS IPv6 rejected (v1 is IPv4-only)")
-		// 0x08 = Address type not supported
-		_, _ = conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		if v4 := ip.To4(); v4 != nil {
+			host = v4.String()
+			break
+		}
+		_, _ = pc.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	default:
-		_, _ = conn.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = pc.Write([]byte{0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
-	if _, err := io.ReadFull(conn, buf[:2]); err != nil {
+	if _, err := io.ReadFull(pc, buf[:2]); err != nil {
 		return
 	}
 	port := binary.BigEndian.Uint16(buf[:2])
@@ -230,12 +244,49 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 			Via: "drop", Rule: r, OK: false, Error: "blocked",
 		})
 		// 0x02 = connection not allowed by ruleset
-		_, _ = conn.Write([]byte{0x05, 0x02, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		_, _ = pc.Write([]byte{0x05, 0x02, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		return
 	}
 
-	dctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	remote, via, rule, dur, err := s.dialTarget(ctx, host, target, timeout)
+	if err != nil {
+		if via == "tunnel" {
+			log.Warn("SOCKS dial failed", "target", target, "via", via, "err", err)
+		} else {
+			log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
+		}
+		s.record(ConnEvent{
+			Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
+			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,
+		})
+		_, _ = pc.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+		return
+	}
+	log.Debug("SOCKS connect", "target", target, "via", via)
+	s.record(ConnEvent{
+		Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
+		Via: via, Rule: rule, OK: true, DurationMs: dur,
+	})
+	defer remote.Close()
+
+	// success
+	if _, err := pc.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0}); err != nil {
+		return
+	}
+	_ = pc.SetDeadline(time.Time{})
+	relay(pc, remote)
+}
+
+type prefixConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *prefixConn) Read(p []byte) (int, error) {
+	return c.r.Read(p)
+}
+
+func (s *SOCKS5) dialTarget(ctx context.Context, host, target string, timeout time.Duration) (net.Conn, string, string, int64, error) {
 	dialer := s.Dialer
 	via := "tunnel"
 	rule := ""
@@ -256,35 +307,11 @@ func (s *SOCKS5) handle(ctx context.Context, conn net.Conn) {
 			}
 		}
 	}
+	dctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	start := time.Now()
 	remote, err := dialer.DialContext(dctx, "tcp", target)
-	dur := time.Since(start).Milliseconds()
-	if err != nil {
-		if via == "tunnel" {
-			log.Warn("SOCKS dial failed", "target", target, "via", via, "err", err)
-		} else {
-			log.Debug("SOCKS dial failed", "target", target, "via", via, "err", err)
-		}
-		s.record(ConnEvent{
-			Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
-			Via: via, Rule: rule, OK: false, Error: err.Error(), DurationMs: dur,
-		})
-		_, _ = conn.Write([]byte{0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
-		return
-	}
-	log.Debug("SOCKS connect", "target", target, "via", via)
-	s.record(ConnEvent{
-		Proto: "socks", ClientIP: clientIP, Target: target, Host: host, Port: portInt,
-		Via: via, Rule: rule, OK: true, DurationMs: dur,
-	})
-	defer remote.Close()
-
-	// success
-	if _, err := conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0}); err != nil {
-		return
-	}
-	_ = conn.SetDeadline(time.Time{})
-	relay(conn, remote)
+	return remote, via, rule, time.Since(start).Milliseconds(), err
 }
 
 func (s *SOCKS5) record(e ConnEvent) {
