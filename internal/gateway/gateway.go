@@ -59,6 +59,13 @@ func (g *Gateway) applyLocked() error {
 		)
 	}
 
+	if g.active {
+		if err := g.patchSetsLocked(); err == nil {
+			g.logger.Debug("gateway sets updated")
+			return nil
+		}
+	}
+
 	script, err := g.buildNFTScript()
 	if err != nil {
 		return err
@@ -78,6 +85,21 @@ func (g *Gateway) applyLocked() error {
 		"output_redirect", g.cfg.GatewayOutputEnable,
 	)
 	return nil
+}
+
+// patchSetsLocked refreshes bypass/tunnel elements without deleting the table.
+// A full Apply was tearing down OUTPUT for a moment every DNS refresh and
+// resetting live TCP (agy model calls, browsers).
+func (g *Gateway) patchSetsLocked() error {
+	if g.engine == nil {
+		return fmt.Errorf("routing engine is nil")
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "flush set inet %s bypass\n", tableName)
+	addIPv4SetElements(&b, "bypass", g.engine.BypassNets())
+	fmt.Fprintf(&b, "flush set inet %s tunnel\n", tableName)
+	addIPv4SetElements(&b, "tunnel", g.engine.TunnelNets())
+	return g.runNFTLocked(b.String())
 }
 
 // Flush removes the outline_gate table.
@@ -153,7 +175,16 @@ func (g *Gateway) buildNFTScript() (string, error) {
 
 	if g.cfg.GatewayOutputEnable {
 		g.appendOutputRedirect(&b, port)
+		// QUIC/UDP 443 bypasses TCP REDIRECT and leaks the real IP (agy #875).
+		fmt.Fprintf(&b, "add chain inet %s filter_out { type filter hook output priority filter; policy accept; }\n", tableName)
+		fmt.Fprintf(&b, "add rule inet %s filter_out ip daddr @private return\n", tableName)
+		fmt.Fprintf(&b, "add rule inet %s filter_out ip daddr @bypass return\n", tableName)
+		fmt.Fprintf(&b, "add rule inet %s filter_out udp dport { 443, 5228 } reject\n", tableName)
 	}
+
+	fmt.Fprintf(&b, "add chain inet %s filter_fwd { type filter hook forward priority filter; policy accept; }\n", tableName)
+	fmt.Fprintf(&b, "add rule inet %s filter_fwd ip daddr @private return\n", tableName)
+	fmt.Fprintf(&b, "add rule inet %s filter_fwd udp dport { 443, 5228 } reject\n", tableName)
 
 	// masquerade for forwarded LAN traffic. Never SNAT loopback: an unscoped
 	// masquerade rewrites 127.0.0.1 to the primary NIC address and breaks

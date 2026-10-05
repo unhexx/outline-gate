@@ -101,9 +101,11 @@ func TestDryRunInclude(t *testing.T) {
 	if !strings.Contains(script, "ip daddr @private return") {
 		t.Fatal("private skip missing")
 	}
-	// drop is handled in transparent userspace, not nft forward
-	if strings.Contains(script, " type filter hook forward") {
-		t.Fatal("legacy nft forward drop should be gone")
+	if strings.Contains(script, "policy drop") {
+		t.Fatal("forward chain must not drop unmatched TCP")
+	}
+	if !strings.Contains(script, "filter_fwd") || !strings.Contains(script, "udp dport { 443, 5228 } reject") {
+		t.Fatal("QUIC/UDP 443 must be rejected so clients fall back to TCP redirect")
 	}
 }
 
@@ -169,6 +171,9 @@ func TestOutputExcludeRedirectsAfterBypassSkip(t *testing.T) {
 	pre := strings.Index(script, "add rule inet outline_gate prerouting ip protocol tcp redirect to :12345")
 	if pre < 0 {
 		t.Fatal("prerouting IPv4 redirect missing")
+	}
+	if !strings.Contains(script, "filter_out") || !strings.Contains(script, "udp dport { 443, 5228 } reject") {
+		t.Fatal("OUTPUT must reject QUIC so model clients cannot skip TCP redirect")
 	}
 }
 

@@ -270,6 +270,7 @@ func (m *Manager) Refresh(ctx context.Context) error {
 		}
 	}
 	m.mu.Lock()
+	changed := !sameNets(m.resolved, nets)
 	m.resolved = nets
 	if firstErr != nil {
 		m.lastError = firstErr.Error()
@@ -277,7 +278,9 @@ func (m *Manager) Refresh(ctx context.Context) error {
 		m.lastError = ""
 	}
 	m.mu.Unlock()
-	m.notify()
+	if changed {
+		m.notify()
+	}
 	return firstErr
 }
 
@@ -306,4 +309,22 @@ func (m *Manager) notify() {
 	if m.onChange != nil {
 		m.onChange()
 	}
+}
+
+func sameNets(a, b []net.IPNet) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	count := make(map[string]int, len(a))
+	for i := range a {
+		count[a[i].String()]++
+	}
+	for i := range b {
+		k := b[i].String()
+		if count[k] == 0 {
+			return false
+		}
+		count[k]--
+	}
+	return true
 }
