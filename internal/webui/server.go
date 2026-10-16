@@ -37,6 +37,7 @@ type Server struct {
 	Manager Manager
 	Block   Manager           // optional: destination block list
 	Outline OutlineController // optional: key status / replace
+	Tunnel  TunnelController  // optional: Outline vs Amnezia switch
 	ConnLog ConnLog           // optional: live connection log
 	Status  func() RuntimeStatus
 	// Version is the process release string (e.g. "v0.6.0"); exposed publicly.
@@ -71,6 +72,10 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	if s.Outline != nil {
 		mux.Handle("/api/v1/outline", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
 		mux.Handle("/api/v1/outline/", tokenAuth(s.Token, http.HandlerFunc(s.handleOutline)))
+	}
+	if s.Tunnel != nil {
+		mux.Handle("/api/v1/tunnel", tokenAuth(s.Token, http.HandlerFunc(s.handleTunnel)))
+		mux.Handle("/api/v1/tunnel/", tokenAuth(s.Token, http.HandlerFunc(s.handleTunnel)))
 	}
 	if s.ConnLog != nil {
 		// ?token= is accepted only on the EventSource stream (no Authorization header).

@@ -109,6 +109,22 @@ type Config struct {
 	// ProbeFails is consecutive tunnel dial failures before Ready() flips false
 	// and MaintainReady rebuilds the dialer (re-expanding ssconf://).
 	ProbeFails int
+
+	// TunnelBackend is "outline" (default) or "amnezia". SOCKS/L3 stay the
+	// same; only the transport behind them changes.
+	TunnelBackend string
+	// BackendPersistFile stores the last UI-selected backend.
+	BackendPersistFile string
+	// AmneziaConfigFile is an AmneziaWG INI (.conf) used when backend=amnezia.
+	AmneziaConfigFile string
+	// AmneziaVPNURI is the optional vpn:// share string (metadata / Premium).
+	AmneziaVPNURI string
+	// AmneziaVPNURIFile loads vpn:// when AmneziaVPNURI is empty.
+	AmneziaVPNURIFile string
+	// AmneziaIface is the TUN name (nft skips this oif so BindToDevice cannot loop).
+	AmneziaIface string
+	// AmneziaWGBin is the amneziawg-go binary. Empty = look in PATH.
+	AmneziaWGBin string
 }
 
 // Load reads configuration from the process environment.
@@ -143,6 +159,11 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		ProbeInterval:        30 * time.Second,
 		ProbeTimeout:         8 * time.Second,
 		ProbeFails:           2,
+		TunnelBackend:        "outline",
+		BackendPersistFile:   "/config/tunnel_backend.txt",
+		AmneziaConfigFile:    "/config/amnezia.awg.conf",
+		AmneziaVPNURIFile:    "/config/amnezia.vpnuri.txt",
+		AmneziaIface:         "og-awg0",
 	}
 
 	key, err := loadAccessKey(getenv)
@@ -282,6 +303,38 @@ func LoadFromEnv(getenv func(string) string) (*Config, error) {
 		}
 		cfg.ProbeFails = n
 	}
+	if v := strings.TrimSpace(getenv("TUNNEL_BACKEND_PERSIST_FILE")); v != "" {
+		cfg.BackendPersistFile = v
+	}
+	if v := strings.TrimSpace(getenv("AMNEZIA_CONFIG_FILE")); v != "" {
+		cfg.AmneziaConfigFile = v
+	}
+	if v := strings.TrimSpace(getenv("AMNEZIA_VPN_URI")); v != "" {
+		cfg.AmneziaVPNURI = v
+	}
+	if v := strings.TrimSpace(getenv("AMNEZIA_VPN_URI_FILE")); v != "" {
+		cfg.AmneziaVPNURIFile = v
+	}
+	if v := strings.TrimSpace(getenv("AMNEZIA_IFACE")); v != "" {
+		cfg.AmneziaIface = v
+	}
+	if v := strings.TrimSpace(getenv("AMNEZIA_WG_BIN")); v != "" {
+		cfg.AmneziaWGBin = v
+	}
+	if cfg.AmneziaVPNURI == "" && cfg.AmneziaVPNURIFile != "" {
+		if b, err := os.ReadFile(cfg.AmneziaVPNURIFile); err == nil {
+			cfg.AmneziaVPNURI = firstNonCommentLine(string(b))
+		}
+	}
+	backend := strings.ToLower(strings.TrimSpace(getenv("TUNNEL_BACKEND")))
+	if p := strings.TrimSpace(cfg.BackendPersistFile); p != "" {
+		if v := strings.ToLower(ReadPersistedKey(p)); v != "" {
+			backend = v
+		}
+	}
+	if backend != "" {
+		cfg.TunnelBackend = backend
+	}
 
 	bypass, err := loadCIDRs(getenv, "BYPASS_CIDRS", "BYPASS_CIDRS_FILE")
 	if err != nil {
@@ -408,6 +461,32 @@ func ReadPersistedKey(path string) string {
 		return ""
 	}
 	return firstNonCommentLine(string(b))
+}
+
+// PersistBackend writes outline|amnezia to path so a UI switch survives restart.
+func PersistBackend(path, backend string) error {
+	path = strings.TrimSpace(path)
+	backend = strings.ToLower(strings.TrimSpace(backend))
+	if path == "" {
+		return fmt.Errorf("persist path is empty")
+	}
+	if backend != "outline" && backend != "amnezia" {
+		return fmt.Errorf("backend must be outline or amnezia")
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	tmp := path + ".tmp"
+	content := "# outline-gate tunnel backend\n" + backend + "\n"
+	if err := os.WriteFile(tmp, []byte(content), 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func loadCIDRs(getenv func(string) string, envKey, fileKey string) ([]net.IPNet, error) {
@@ -596,6 +675,17 @@ func (c *Config) Validate() error {
 	}
 	if c.UIEnable && strings.TrimSpace(c.UIToken) == "" {
 		return fmt.Errorf("UI_TOKEN is required when UI_ENABLE=true")
+	}
+	switch strings.ToLower(strings.TrimSpace(c.TunnelBackend)) {
+	case "", "outline", "ss":
+		c.TunnelBackend = "outline"
+	case "amnezia", "awg", "amneziawg":
+		c.TunnelBackend = "amnezia"
+	default:
+		return fmt.Errorf("TUNNEL_BACKEND must be outline or amnezia, got %q", c.TunnelBackend)
+	}
+	if strings.TrimSpace(c.AmneziaIface) == "" {
+		c.AmneziaIface = "og-awg0"
 	}
 	if c.BypassDNSRefresh <= 0 {
 		return fmt.Errorf("BYPASS_DNS_REFRESH must be positive")

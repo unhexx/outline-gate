@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/unhexx/outline-gate/internal/amnezia"
 	"github.com/unhexx/outline-gate/internal/bypass"
 	"github.com/unhexx/outline-gate/internal/config"
 	"github.com/unhexx/outline-gate/internal/connlog"
@@ -27,6 +28,7 @@ import (
 	"github.com/unhexx/outline-gate/internal/outline"
 	"github.com/unhexx/outline-gate/internal/proxy"
 	"github.com/unhexx/outline-gate/internal/routing"
+	"github.com/unhexx/outline-gate/internal/tunnel"
 	"github.com/unhexx/outline-gate/internal/version"
 	"github.com/unhexx/outline-gate/internal/webui"
 )
@@ -108,6 +110,44 @@ func run() error {
 		log.Info("outline dialer ready", "server_ip", client.ServerIP())
 	}
 
+	var awg *amnezia.Client
+	if p := strings.TrimSpace(cfg.AmneziaConfigFile); p != "" {
+		ac, err := amnezia.LoadFile(p)
+		if err != nil {
+			log.Warn("amnezia config not loaded", "path", p, "err", err)
+		} else {
+			awg = &amnezia.Client{
+				Iface:  cfg.AmneziaIface,
+				WGBin:  cfg.AmneziaWGBin,
+				Conf:   ac,
+				Logger: log,
+				Probe:  cfg.ProbeAddr,
+			}
+			if uri := strings.TrimSpace(cfg.AmneziaVPNURI); uri != "" {
+				if meta, _, uerr := amnezia.DecodeVPNURI(uri); uerr == nil {
+					log.Info("amnezia vpn:// loaded", "name", meta.Name, "protocol", meta.ServiceProtocol)
+				}
+			}
+			log.Info("amnezia backend available", "endpoint", ac.Endpoint, "iface", cfg.AmneziaIface)
+		}
+	}
+	var amneziaDialer tunnel.Dialer
+	if awg != nil {
+		amneziaDialer = awg
+	}
+	dialMux := tunnel.NewMux(
+		client, amneziaDialer,
+		client.Ready,
+		func() bool { return awg != nil && awg.Ready() },
+		client.ServerIP,
+		func() net.IP {
+			if awg == nil {
+				return nil
+			}
+			return awg.EndpointIP()
+		},
+	)
+
 	var (
 		mu          sync.Mutex
 		gw          *gateway.Gateway
@@ -129,7 +169,7 @@ func run() error {
 		if bypassMgr == nil {
 			return
 		}
-		engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+		engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), tunnelBypassIPs(client, awg))
 		if gw != nil {
 			if err := gw.UpdateEngine(engine); err != nil {
 				log.Error("gateway update after bypass change", "err", err)
@@ -161,14 +201,14 @@ func run() error {
 	}
 
 	mu.Lock()
-	engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+	engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), tunnelBypassIPs(client, awg))
 	if cfg.GatewayEnable {
 		gw = gateway.New(cfg, engine, log)
 	}
 	mu.Unlock()
 
 	hs := &health.Server{
-		TunnelReady:     client.Ready,
+		TunnelReady:     dialMux.Ready,
 		GatewayRequired: cfg.GatewayEnable,
 		GatewayReady: func() bool {
 			mu.Lock()
@@ -205,11 +245,81 @@ func run() error {
 		}
 	})
 
-	mux := hs.Mux()
+	httpMux := hs.Mux()
 	if met != nil {
-		mux.Handle("/metrics", met.Handler())
+		httpMux.Handle("/metrics", met.Handler())
 		log.Info("prometheus metrics enabled", "path", "/metrics")
 	}
+	tunnelStatus := func() webui.TunnelStatus {
+		st := webui.TunnelStatus{
+			Backend: dialMux.Backend(),
+			Ready:   dialMux.Ready(),
+			Outline: webui.OutlineStatus{
+				AccessKeyRedacted: config.RedactAccessKey(client.AccessKey()),
+				Ready:             client.Ready(),
+				PersistFile:       cfg.AccessKeyPersistFile,
+			},
+			Amnezia: webui.AmneziaStatus{
+				Configured: awg != nil,
+				Label:      "Швеция",
+				Iface:      cfg.AmneziaIface,
+			},
+		}
+		if ip := client.ServerIP(); ip != nil {
+			st.Outline.ServerIP = ip.String()
+		}
+		if awg != nil {
+			st.Amnezia.Ready = awg.Ready()
+			st.Amnezia.Endpoint = awg.Conf.Endpoint
+			if awg.Iface != "" {
+				st.Amnezia.Iface = awg.Iface
+			}
+		}
+		return st
+	}
+	switchBackend := func(ctx context.Context, name string) (webui.TunnelStatus, error) {
+		name = tunnel.Normalize(name)
+		switch name {
+		case tunnel.BackendAmnezia:
+			if awg == nil {
+				return tunnelStatus(), fmt.Errorf("нет конфига AmneziaWG (%s)", cfg.AmneziaConfigFile)
+			}
+			if err := awg.Up(ctx); err != nil {
+				_ = dialMux.SetBackend(tunnel.BackendOutline)
+				return tunnelStatus(), err
+			}
+			if err := dialMux.SetBackend(tunnel.BackendAmnezia); err != nil {
+				_ = awg.Down()
+				return tunnelStatus(), err
+			}
+		case tunnel.BackendOutline:
+			_ = dialMux.SetBackend(tunnel.BackendOutline)
+			if awg != nil {
+				_ = awg.Down()
+			}
+		default:
+			return tunnelStatus(), fmt.Errorf("unknown tunnel backend %q", name)
+		}
+		if err := config.PersistBackend(cfg.BackendPersistFile, dialMux.Backend()); err != nil {
+			log.Warn("persist tunnel backend", "err", err)
+		}
+		rebuildPush()
+		netrecover.ClearPath(dialMux.ServerIP())
+		log.Info("tunnel backend", "backend", dialMux.Backend(), "ready", dialMux.Ready(), "server_ip", dialMux.ServerIP())
+		st := tunnelStatus()
+		st.Message = "активен " + dialMux.Backend()
+		return st, nil
+	}
+
+	if cfg.TunnelBackend == tunnel.BackendAmnezia {
+		sctx, scancel := context.WithTimeout(ctx, 45*time.Second)
+		_, err := switchBackend(sctx, tunnel.BackendAmnezia)
+		scancel()
+		if err != nil {
+			log.Warn("amnezia startup failed; staying on outline", "err", err)
+		}
+	}
+
 	if cfg.UIEnable {
 		ui := &webui.Server{
 			Manager: bypassMgr,
@@ -228,6 +338,7 @@ func run() error {
 				},
 				PersistPath: cfg.AccessKeyPersistFile,
 			},
+			Tunnel:  &uiTunnel{status: tunnelStatus, set: switchBackend},
 			ConnLog: connStore,
 			Status: func() webui.RuntimeStatus {
 				c := getCfg()
@@ -242,6 +353,14 @@ func run() error {
 			Token:   cfg.UIToken,
 			Static:  webui.StaticFS(),
 			RestartServices: func(rctx context.Context) (string, error) {
+				if dialMux.Backend() == tunnel.BackendAmnezia && awg != nil {
+					netrecover.ClearPath(awg.EndpointIP())
+					if err := awg.Up(rctx); err != nil {
+						return "", err
+					}
+					rebuildPush()
+					return "AmneziaWG переподключён", nil
+				}
 				netrecover.ClearPath(client.ServerIP())
 				if err := client.Reconnect(rctx); err != nil {
 					if fresh, lerr := config.Load(); lerr == nil && fresh.AccessKey != client.AccessKey() {
@@ -270,13 +389,13 @@ func run() error {
 				cancel()
 			},
 		}
-		ui.Mount(mux)
+		ui.Mount(httpMux)
 		log.Info("management UI enabled", "path", "/ui/", "key_persist", cfg.AccessKeyPersistFile)
 	}
 
 	httpSrv := &http.Server{
 		Addr:              cfg.HealthListen,
-		Handler:           mux,
+		Handler:           httpMux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -325,7 +444,7 @@ func run() error {
 			Listen:  cfg.DNSListen,
 			URL:     cfg.DoHURL,
 			Addr:    cfg.DoHAddr,
-			Dialer:  client,
+			Dialer:  dialMux,
 			Logger:  log,
 			Timeout: 8 * time.Second,
 		}
@@ -341,7 +460,7 @@ func run() error {
 	directDial := netdns.Dialer()
 	socks := &proxy.SOCKS5{
 		ListenAddr:   cfg.SOCKSListen,
-		Dialer:       client,
+		Dialer:       dialMux,
 		DirectDialer: directDial,
 		Bypass:       bypassMgr,
 		Block:        blockMgr,
@@ -360,7 +479,7 @@ func run() error {
 	if cfg.GatewayEnable {
 		tp := &proxy.Transparent{
 			ListenAddr:   cfg.TransproxyListen,
-			Dialer:       client,
+			Dialer:       dialMux,
 			DirectDialer: directDial,
 			Decider: &proxy.EnginePathDecider{
 				Mu:     &mu,
@@ -384,7 +503,7 @@ func run() error {
 			defer wg.Done()
 			// Wait until tunnel is ready or 60s elapses (then apply anyway).
 			deadline := time.Now().Add(60 * time.Second)
-			for !client.Ready() {
+			for !dialMux.Ready() {
 				if ctx.Err() != nil {
 					return
 				}
@@ -462,7 +581,7 @@ func run() error {
 				cfg = newCfg
 				socks.SetAllowCIDRs(cfg.SOCKSAllowCIDRs)
 				if gw != nil {
-					engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), serverIPsFrom(client))
+					engine = routing.NewWithBypass(cfg, bypassMgr.EffectiveBypassNets(), tunnelBypassIPs(client, awg))
 					wasActive := gw.Active()
 					gw = gateway.New(cfg, engine, log)
 					mu.Unlock()
@@ -514,6 +633,11 @@ func run() error {
 		}
 	}
 	_ = socks.Close()
+	if awg != nil {
+		if err := awg.Down(); err != nil {
+			log.Warn("amnezia down", "err", err)
+		}
+	}
 	cancel()
 
 	// Bounded wait: Accept() loops exit on closed listeners; stuck handlers
@@ -539,6 +663,35 @@ func serverIPsFrom(client *outline.Client) []net.IP {
 		return []net.IP{ip}
 	}
 	return nil
+}
+
+func tunnelBypassIPs(client *outline.Client, awg *amnezia.Client) []net.IP {
+	ips := serverIPsFrom(client)
+	if awg != nil {
+		if ip := awg.EndpointIP(); ip != nil {
+			ips = append(ips, ip)
+		}
+	}
+	return ips
+}
+
+type uiTunnel struct {
+	status func() webui.TunnelStatus
+	set    func(context.Context, string) (webui.TunnelStatus, error)
+}
+
+func (t *uiTunnel) Status() webui.TunnelStatus {
+	if t == nil || t.status == nil {
+		return webui.TunnelStatus{}
+	}
+	return t.status()
+}
+
+func (t *uiTunnel) SetBackend(ctx context.Context, backend string) (webui.TunnelStatus, error) {
+	if t == nil || t.set == nil {
+		return webui.TunnelStatus{}, fmt.Errorf("tunnel switcher not configured")
+	}
+	return t.set(ctx, backend)
 }
 
 // isLoopbackListen reports whether addr binds only to loopback (127.0.0.1 / ::1).

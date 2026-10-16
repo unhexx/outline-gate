@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.26-alpine AS build
-ARG VERSION=0.7.1
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+ARG VERSION=0.8.0
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags="-s -w -X github.com/unhexx/outline-gate/internal/version.Version=${VERSION}" \
     -o /out/outline-gate ./cmd/outline-gate
@@ -15,6 +15,8 @@ FROM alpine:3.21
 # Soft-pin nftables major.minor to avoid silent breaking upgrades on rebuild.
 RUN apk add --no-cache ca-certificates nftables=~1.1 iproute2 wget conntrack-tools util-linux
 COPY --from=build /out/outline-gate /usr/local/bin/outline-gate
+COPY dist/amneziawg-go /usr/local/bin/amneziawg-go
+RUN chmod +x /usr/local/bin/amneziawg-go
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 # 1080 = SOCKS5, 8080 = health/UI. TRANSPROXY_LISTEN defaults to 127.0.0.1:12345

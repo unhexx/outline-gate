@@ -60,6 +60,30 @@ func TestLoadFromEnv_IncludeWithCIDRs(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnv_AmneziaBackendFromPersist(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "backend")
+	if err := PersistBackend(path, "amnezia"); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{
+		"OUTLINE_ACCESS_KEY":           "ss://secret@1.2.3.4:8388",
+		"TUNNEL_BACKEND":               "outline",
+		"TUNNEL_BACKEND_PERSIST_FILE":  path,
+		"AMNEZIA_CONFIG_FILE":          filepath.Join(dir, "missing.conf"),
+	}
+	cfg, err := LoadFromEnv(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TunnelBackend != "amnezia" {
+		t.Fatalf("persist must win: %s", cfg.TunnelBackend)
+	}
+	if cfg.AmneziaIface != "og-awg0" {
+		t.Fatalf("iface default: %s", cfg.AmneziaIface)
+	}
+}
+
 func TestLoadFromEnv_KeyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "key")

@@ -35,6 +35,11 @@ deploy/compose/.env
 # Runtime secrets written by Web UI
 deploy/compose/config/outline_key.runtime.txt
 **/outline_key.runtime.txt
+deploy/compose/config/outline_key.runtime.txt.expanded
+**/*.runtime.txt.expanded
+deploy/compose/config/amnezia.awg.conf
+deploy/compose/config/amnezia.vpnuri.txt
+deploy/compose/config/tunnel_backend.txt
 
 # Runtime bypass/block rules (UI/API); templates are *.rules.example.txt
 deploy/compose/config/bypass.rules.txt

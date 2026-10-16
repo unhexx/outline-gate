@@ -30,8 +30,12 @@
     readyPill: document.getElementById("ready-pill"),
     authPill: document.getElementById("auth-pill"),
     stReady: document.getElementById("st-ready"),
+    stBackend: document.getElementById("st-backend"),
     stServer: document.getElementById("st-server"),
     stKey: document.getElementById("st-key"),
+    btnBackendOutline: document.getElementById("btn-backend-outline"),
+    btnBackendAmnezia: document.getElementById("btn-backend-amnezia"),
+    backendMsg: document.getElementById("backend-msg"),
     stSocks: document.getElementById("st-socks"),
     stGw: document.getElementById("st-gw"),
     stRates: document.getElementById("st-rates"),
@@ -214,11 +218,24 @@
 
   function renderStatus(data) {
     el.statusError.hidden = true;
-    const o = (data && data.outline) || {};
-    setReadyPill(typeof o.ready === "boolean" ? o.ready : null);
-    el.stReady.textContent = o.ready ? "ready" : "not ready";
-    el.stServer.textContent = o.server_ip || "—";
+    const tun = (data && data.tunnel) || {};
+    const o = tun.outline || (data && data.outline) || {};
+    const a = tun.amnezia || {};
+    const backend = tun.backend || "outline";
+    const ready = typeof tun.ready === "boolean" ? tun.ready : o.ready;
+    setReadyPill(typeof ready === "boolean" ? ready : null);
+    if (el.stBackend) {
+      el.stBackend.textContent = backend === "amnezia" ? "Amnezia SE" : "Outline";
+    }
+    el.stReady.textContent = ready ? "ready" : "not ready";
+    const server = backend === "amnezia" ? (a.endpoint || "—") : (o.server_ip || "—");
+    el.stServer.textContent = server;
     el.stKey.textContent = o.access_key_redacted || "—";
+    if (el.btnBackendOutline && el.btnBackendAmnezia) {
+      el.btnBackendOutline.classList.toggle("ghost", backend !== "outline");
+      el.btnBackendAmnezia.classList.toggle("ghost", backend !== "amnezia");
+      el.btnBackendAmnezia.disabled = a.configured === false;
+    }
     el.stSocks.textContent = (data && data.socks) || "—";
     el.stGw.textContent = data && data.gateway ? "включён" : "выкл";
     const c = (data && data.connlog) || {};
@@ -661,6 +678,34 @@
   }
   if (el.restartServices) el.restartServices.addEventListener("click", () => restart("services"));
   if (el.restartContainer) el.restartContainer.addEventListener("click", () => restart("container"));
+
+  function showBackend(msg) {
+    if (!el.backendMsg) return;
+    el.backendMsg.hidden = !msg;
+    el.backendMsg.textContent = msg || "";
+  }
+
+  async function setBackend(name) {
+    const label = name === "amnezia" ? "Amnezia SE (Швеция)" : "Outline";
+    if (!confirm("Переключить туннель на " + label + "?")) return;
+    showBackend("переключение…");
+    try {
+      const res = await api("/api/v1/tunnel", {
+        method: "POST",
+        body: JSON.stringify({ backend: name }),
+      });
+      showBackend((res && res.status && res.status.message) || "готово");
+      await loadStatus();
+    } catch (e) {
+      showBackend("");
+      if (el.statusError) {
+        el.statusError.hidden = false;
+        el.statusError.textContent = e.message;
+      }
+    }
+  }
+  if (el.btnBackendOutline) el.btnBackendOutline.addEventListener("click", () => setBackend("outline"));
+  if (el.btnBackendAmnezia) el.btnBackendAmnezia.addEventListener("click", () => setBackend("amnezia"));
 
   el.form.addEventListener("submit", async (ev) => {
     ev.preventDefault();

@@ -18,6 +18,19 @@ import (
 	"github.com/unhexx/outline-gate/internal/connlog"
 )
 
+type fakeTunnel struct {
+	backend string
+}
+
+func (f *fakeTunnel) Status() TunnelStatus {
+	return TunnelStatus{Backend: f.backend, Ready: true, Amnezia: AmneziaStatus{Configured: true, Label: "Швеция"}}
+}
+
+func (f *fakeTunnel) SetBackend(ctx context.Context, backend string) (TunnelStatus, error) {
+	f.backend = backend
+	return f.Status(), nil
+}
+
 type fakeOutline struct {
 	key   string
 	ready bool
@@ -48,7 +61,8 @@ func TestAPIAuthAndCRUD(t *testing.T) {
 		},
 	})
 	fo := &fakeOutline{key: "ss://x@1.1.1.1:1", ready: true}
-	srv := &Server{Manager: mgr, Outline: fo, Token: "secret", Static: StaticFS()}
+	ft := &fakeTunnel{backend: "outline"}
+	srv := &Server{Manager: mgr, Outline: fo, Tunnel: ft, Token: "secret", Static: StaticFS()}
 	mux := http.NewServeMux()
 	srv.Mount(mux)
 
@@ -126,6 +140,29 @@ func TestAPIAuthAndCRUD(t *testing.T) {
 	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ui/", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("ui: %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: %d %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), `"backend":"outline"`) {
+		t.Fatalf("status tunnel: %s", rr.Body.String())
+	}
+	tbody := bytes.NewBufferString(`{"backend":"amnezia"}`)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/tunnel", tbody)
+	req.Header.Set("Authorization", "Bearer secret")
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("tunnel switch: %d %s", rr.Code, rr.Body.String())
+	}
+	if ft.backend != "amnezia" {
+		t.Fatalf("tunnel backend: %s", ft.backend)
 	}
 }
 

@@ -167,6 +167,33 @@ func TestOutputExcludeRedirectsAfterBypassSkip(t *testing.T) {
 	if !(priv < byp && byp < redir) {
 		t.Fatal("OUTPUT skip rules must precede redirect")
 	}
+}
+
+func TestOutputSkipsAmneziaIface(t *testing.T) {
+	cfg := &config.Config{
+		RoutingMode:         config.ModeExclude,
+		DirectPolicy:        config.DirectAllow,
+		BypassCIDRs:         config.DefaultBypassCIDRs(),
+		TransproxyPort:      12345,
+		GatewayOutputEnable: true,
+		AmneziaIface:        "og-awg0",
+	}
+	g := New(cfg, routing.New(cfg, nil), nil)
+	script, err := g.DryRunScript()
+	if err != nil {
+		t.Fatal(err)
+	}
+	skip := strings.Index(script, `add rule inet outline_gate output oifname "og-awg0" return`)
+	redir := strings.Index(script, "add rule inet outline_gate output ip protocol tcp redirect to :12345")
+	if skip < 0 || redir < 0 || skip > redir {
+		t.Fatal("OUTPUT must skip Amnezia TUN before TCP redirect")
+	}
+	if !strings.Contains(script, `add rule inet outline_gate postrouting oifname "og-awg0" return`) {
+		t.Fatal("postrouting must not masquerade the Amnezia TUN")
+	}
+	if !strings.Contains(script, "add rule inet outline_gate output ip saddr @private return") {
+		t.Fatal("OUTPUT must skip packets sourced from the Amnezia TUN/CGNAT range")
+	}
 	// prerouting must still blanket-redirect (userspace logs Direct)
 	pre := strings.Index(script, "add rule inet outline_gate prerouting ip protocol tcp redirect to :12345")
 	if pre < 0 {

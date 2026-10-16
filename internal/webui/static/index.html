@@ -58,7 +58,8 @@
         <div class="card">
           <h2>Состояние</h2>
           <div class="stat-grid" id="status-grid">
-            <div class="stat"><span class="stat-label">Outline</span><span class="stat-value" id="st-ready">—</span></div>
+            <div class="stat"><span class="stat-label">Туннель</span><span class="stat-value" id="st-backend">—</span></div>
+            <div class="stat"><span class="stat-label">VPN</span><span class="stat-value" id="st-ready">—</span></div>
             <div class="stat"><span class="stat-label">Сервер</span><span class="stat-value mono" id="st-server">—</span></div>
             <div class="stat"><span class="stat-label">Ключ</span><span class="stat-value mono" id="st-key">—</span></div>
             <div class="stat"><span class="stat-label">SOCKS</span><span class="stat-value mono" id="st-socks">—</span></div>
@@ -66,6 +67,12 @@
             <div class="stat"><span class="stat-label">1 мин</span><span class="stat-value" id="st-rates">—</span></div>
           </div>
           <p class="hint" id="status-hint">Вкладка <strong>Лог</strong> — VPN vs Direct в реальном времени.</p>
+          <div class="row" style="margin-top:0.45rem" id="backend-row">
+            <button type="button" id="btn-backend-outline">Outline</button>
+            <button type="button" id="btn-backend-amnezia" class="ghost">Amnezia SE</button>
+          </div>
+          <p class="hint">Outline — как раньше (ss://). Amnezia SE — AmneziaWG Швеция, SOCKS и L3 те же; default-route хоста не меняется.</p>
+          <p id="backend-msg" class="hint" hidden></p>
           <div class="row" style="margin-top:0.45rem">
             <button type="button" id="btn-restart-services">Перезапустить службы</button>
             <button type="button" id="btn-restart-container" class="ghost">Перезапустить контейнер</button>

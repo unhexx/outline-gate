@@ -81,6 +81,14 @@ services:
       # Optional SOCKS source allowlist (CSV / file). Empty = accept all.
       SOCKS_ALLOW_CIDRS: ${SOCKS_ALLOW_CIDRS:-}
       SOCKS_ALLOW_CIDRS_FILE: ${SOCKS_ALLOW_CIDRS_FILE:-}
+      TUNNEL_BACKEND: ${TUNNEL_BACKEND:-outline}
+      TUNNEL_BACKEND_PERSIST_FILE: ${TUNNEL_BACKEND_PERSIST_FILE:-/config/tunnel_backend.txt}
+      AMNEZIA_CONFIG_FILE: ${AMNEZIA_CONFIG_FILE:-/config/amnezia.awg.conf}
+      AMNEZIA_VPN_URI_FILE: ${AMNEZIA_VPN_URI_FILE:-/config/amnezia.vpnuri.txt}
+      AMNEZIA_IFACE: ${AMNEZIA_IFACE:-og-awg0}
+      AMNEZIA_WG_BIN: ${AMNEZIA_WG_BIN:-/usr/local/bin/amneziawg-go}
+    devices:
+      - /dev/net/tun
     volumes:
       # rw: UI/API пишет bypass.rules.txt; static CIDR-файлы тоже здесь
       - ./config:/config

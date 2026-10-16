@@ -179,6 +179,9 @@ func (g *Gateway) buildNFTScript() (string, error) {
 		fmt.Fprintf(&b, "add chain inet %s filter_out { type filter hook output priority filter; policy accept; }\n", tableName)
 		fmt.Fprintf(&b, "add rule inet %s filter_out ip daddr @private return\n", tableName)
 		fmt.Fprintf(&b, "add rule inet %s filter_out ip daddr @bypass return\n", tableName)
+		if awg := strings.TrimSpace(g.cfg.AmneziaIface); awg != "" {
+			fmt.Fprintf(&b, "add rule inet %s filter_out oifname %q return\n", tableName, awg)
+		}
 		fmt.Fprintf(&b, "add rule inet %s filter_out udp dport { 443, 5228 } reject\n", tableName)
 	}
 
@@ -192,6 +195,9 @@ func (g *Gateway) buildNFTScript() (string, error) {
 	fmt.Fprintf(&b, "add chain inet %s postrouting { type nat hook postrouting priority srcnat; policy accept; }\n", tableName)
 	fmt.Fprintf(&b, "add rule inet %s postrouting ip saddr 127.0.0.0/8 return\n", tableName)
 	fmt.Fprintf(&b, "add rule inet %s postrouting oifname \"lo\" return\n", tableName)
+	if awg := strings.TrimSpace(g.cfg.AmneziaIface); awg != "" {
+		fmt.Fprintf(&b, "add rule inet %s postrouting oifname %q return\n", tableName, awg)
+	}
 	if ifc := strings.TrimSpace(g.cfg.LANInterface); ifc != "" {
 		fmt.Fprintf(&b, "add rule inet %s postrouting oifname %q masquerade\n", tableName, ifc)
 	} else {
@@ -226,6 +232,12 @@ func addIPv4SetElements(b *strings.Builder, set string, nets []net.IPNet) {
 // include: redirect only @tunnel (residual Direct never enters the proxy).
 func (g *Gateway) appendOutputRedirect(b *strings.Builder, port int) {
 	fmt.Fprintf(b, "add rule inet %s output tcp dport %d return\n", tableName, port)
+	if iface := strings.TrimSpace(g.cfg.AmneziaIface); iface != "" {
+		// BindToDevice(awg) must not be REDIRECTed back into transproxy.
+		fmt.Fprintf(b, "add rule inet %s output oifname %q return\n", tableName, iface)
+	}
+	// TUN/CGNAT sourced packets (AmneziaWG 100.64/10) must not DNAT-loop.
+	fmt.Fprintf(b, "add rule inet %s output ip saddr @private return\n", tableName)
 	fmt.Fprintf(b, "add rule inet %s output ip daddr @private return\n", tableName)
 	switch g.cfg.RoutingMode {
 	case config.ModeInclude:

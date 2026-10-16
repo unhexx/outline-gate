@@ -144,6 +144,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if s.Outline != nil {
 		out["outline"] = s.Outline.Status()
 	}
+	if s.Tunnel != nil {
+		out["tunnel"] = s.Tunnel.Status()
+	}
 	if s.Status != nil {
 		st := s.Status()
 		if st.Version != "" {
@@ -157,13 +160,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		since := time.Now().Add(-time.Minute)
 		total, vpn, direct, okN, fail := s.ConnLog.Stats(since)
 		out["connlog"] = map[string]any{
-			"capacity": s.ConnLog.Capacity(),
-			"count":    s.ConnLog.Len(),
-			"vpn_1m":   vpn,
+			"capacity":  s.ConnLog.Capacity(),
+			"count":     s.ConnLog.Len(),
+			"vpn_1m":    vpn,
 			"direct_1m": direct,
-			"total_1m": total,
-			"ok_1m":    okN,
-			"fail_1m":  fail,
+			"total_1m":  total,
+			"ok_1m":     okN,
+			"fail_1m":   fail,
 		}
 	}
 	writeJSON(w, http.StatusOK, out)

@@ -12,6 +12,14 @@ Published releases: https://github.com/unhexx/outline-gate/releases
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-05
+
+### Added
+
+- Switch the tunnel backend from Outline (`ss://`) to AmneziaWG without changing SOCKS, L3 redirect, or bypass. UI: **Outline** / **Amnezia SE** (`POST /api/v1/tunnel`).
+- AmneziaWG runs in userspace (`amneziawg-go`) on `og-awg0`. No default route is installed; tunnel dials use `BindToDevice`. The Amnezia endpoint stays in `@bypass`.
+- Config: `TUNNEL_BACKEND`, `AMNEZIA_CONFIG_FILE` (INI), optional `vpn://` in `AMNEZIA_VPN_URI` / `AMNEZIA_VPN_URI_FILE`. Selection is persisted in `TUNNEL_BACKEND_PERSIST_FILE`.
+
 ## [0.7.1] — 2026-10-02
 
 ### Fixed

@@ -2,6 +2,7 @@
 .bin
 bin
 dist
+!dist/amneziawg-go
 **/.env
 **/secrets/outline_key.local.txt
 **/*_test.go
